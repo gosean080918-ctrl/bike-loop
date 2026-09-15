@@ -1,0 +1,56 @@
+name: bike_reclaim
+description: BIKE LOOP — 방치 자전거 신고·수거 최적화 앱
+publish_to: "none"
+version: 0.2.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 상태관리
+  flutter_riverpod: ^2.5.1
+
+  # 백엔드 (Supabase: Auth + PostgreSQL + Storage)
+  # ※ sb_publishable_ 키 사용 — 신버전 필요
+  supabase_flutter: ^2.9.0
+
+  # 지도 - 카카오맵 (JS SDK 기반 webview 플러그인)
+  kakao_map_plugin: ^0.4.0
+
+  # 기기 기능
+  image_picker: ^1.1.2
+  geolocator: ^13.0.1
+
+  intl: ^0.19.0
+
+  # 관리자 기능: 최적화 서버 호출 + 카카오맵 외부 앱 연결
+  http: ^1.2.0
+  url_launcher: ^6.3.0
+
+  # 출발지/복귀지 설정 저장
+  shared_preferences: ^2.3.0
+
+  # 브랜드 폰트 (Varela Round — BIKE LOOP 워드마크용)
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
+
+# 앱 아이콘 생성: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/logo.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png

@@ -1,0 +1,5 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+ortools>=9.10
+httpx>=0.27          # /address 프록시 + 테스트
+python-dotenv>=1.0   # .env의 KAKAO_REST_KEY 로드

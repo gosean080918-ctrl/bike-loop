@@ -1,0 +1,19 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# 플랫폼 빌드 산출물
+android/.gradle/
+ios/Pods/
+ios/.symlinks/
+
+# 비밀키 - 절대 커밋 금지 (DetectingMites 실수 반복 방지!)
+# firebase_options.dart 는 클라이언트 키라 커밋 가능하지만,
+# google-services.json / GoogleService-Info.plist 는 팀 정책에 따라 결정.
+*.keystore
+*.jks
+key.properties
+.env

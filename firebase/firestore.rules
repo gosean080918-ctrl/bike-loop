@@ -1,0 +1,51 @@
+rules_version = '2';
+// INF-02: 역할 기반 접근 제어 (blueprint 섹션2)
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function role() {
+      return signedIn() && 'role' in request.auth.token
+          ? request.auth.token.role : 'reporter';
+    }
+    function isAdmin() { return role() == 'admin'; }
+    function isCollector() { return role() == 'collector' || isAdmin(); }
+
+    // users: 본인 문서만 읽기/생성. role 필드는 스스로 못 바꿈(Custom Claims는 서버에서만)
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if signedIn() && request.auth.uid == uid
+          && request.resource.data.role == 'reporter';
+      allow update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.role == resource.data.role;
+    }
+
+    // reports: 로그인한 누구나 읽기(지도 표시), 생성은 본인 신고만.
+    // 상태 변경(수거 처리)은 collector/admin만.
+    match /reports/{reportId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+          && request.resource.data.reporterUid == request.auth.uid
+          && request.resource.data.status == 'reported';
+      allow update: if isCollector();
+      allow delete: if isAdmin();
+    }
+
+    // hotspots / stats: 서버(Admin SDK)만 쓰기, 클라이언트는 읽기 전용
+    match /hotspots/{cellId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /stats_daily/{day} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // routes: 수거팀/관리자 전용
+    match /routes/{routeId} {
+      allow read: if isCollector();
+      allow create, delete: if isAdmin();
+      allow update: if isCollector();
+    }
+  }
+}

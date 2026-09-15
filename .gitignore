@@ -1,0 +1,88 @@
+# ============================================================
+# BIKE LOOP — Git 제외 목록
+# ============================================================
+# ★ 가장 중요: 비밀 키가 저장소에 올라가면 안 됩니다.
+#   server/.env 에는 카카오 REST 키가 들어 있습니다.
+#   (앱에 있는 Supabase publishable 키와 카카오 JS 키는
+#    RLS/플랫폼 제한으로 보호되는 공개용 키라 포함됩니다 — README 참고)
+# ============================================================
+
+# ---------- 비밀/인증 ----------
+.env
+*.env
+!*.env.example
+server/.env
+*.keystore
+*.jks
+key.properties
+google-services.json
+GoogleService-Info.plist
+service-account*.json
+
+# ---------- 빌드 산출물 (용량 큼) ----------
+build/
+app/build/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+*.apk
+*.aab
+*.ipa
+*.app
+*.dSYM.zip
+
+# ---------- Flutter / Dart ----------
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+doc/api/
+*.g.dart.lock
+
+# ---------- Android ----------
+app/android/.gradle/
+app/android/local.properties
+app/android/app/release/
+*.hprof
+
+# ---------- iOS / macOS ----------
+app/ios/Pods/
+app/ios/.symlinks/
+app/ios/Flutter/Flutter.framework
+app/ios/Flutter/Flutter.podspec
+app/ios/Flutter/Generated.xcconfig
+app/ios/Flutter/flutter_export_environment.sh
+app/ios/Runner.xcworkspace/xcuserdata/
+app/ios/Runner.xcodeproj/xcuserdata/
+app/macos/Pods/
+
+# ---------- Python (최적화 서버) ----------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# ---------- 분석용 원본 데이터 (용량 큼) ----------
+# PoC 결과 리포트(RESULTS.md)와 그래프 이미지는 포함하고,
+# 내려받은 원본 CSV는 제외합니다. 필요하면 NYC 311에서 재수집 가능.
+analysis-server/**/*.csv
+analysis-server/**/raw/
+analysis-server/**/cache/
+
+# ---------- 작업용/개인 자료 ----------
+사진/
+docs/images/
+*.zip
+
+# ---------- OS / 에디터 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.iml
+*.swp
+*~
