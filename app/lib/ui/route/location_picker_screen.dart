@@ -1,11 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 
 import '../../const/value/app_theme.dart';
 import '../../const/value/constants.dart';
+import '../../service/api_client.dart';
 
 /// RPT-02: 지도에서 신고 위치 조정 + 장소 검색 (예: "강남역")
 /// 지도를 움직여 중앙 핀을 맞추거나, 검색으로 바로 이동 후 확정.
@@ -57,9 +57,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     if (q.isEmpty) return;
     setState(() => _searching = true);
     try {
-      final res = await http
-          .get(Uri.parse('$kSearchUrl?q=${Uri.encodeComponent(q)}'))
-          .timeout(const Duration(seconds: 6));
+      final res = await ApiClient.get(
+        Uri.parse('$kSearchUrl?q=${Uri.encodeComponent(q)}'),
+        timeout: const Duration(seconds: 6),
+      );
+      if (res.statusCode == 401) throw Exception(ApiClient.authErrorMessage);
       if (res.statusCode != 200) throw Exception('검색 실패');
       final places = (jsonDecode(res.body)['places'] as List)
           .map((p) => _Place(

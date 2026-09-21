@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../const/value/constants.dart';
+import 'api_client.dart';
 
 /// 출발지/복귀지(보관소) 설정
 class DepotConfig {
@@ -92,9 +92,10 @@ class SettingsService {
   /// 지역별 기본 보관소(도청/시청) 좌표를 얻을 때 사용.
   Future<(double, double, String)?> resolveAddress(String query) async {
     try {
-      final res = await http
-          .get(Uri.parse('$kSearchUrl?q=${Uri.encodeComponent(query)}'))
-          .timeout(const Duration(seconds: 6));
+      final res = await ApiClient.get(
+        Uri.parse('$kSearchUrl?q=${Uri.encodeComponent(query)}'),
+        timeout: const Duration(seconds: 6),
+      );
       if (res.statusCode == 200) {
         final places = jsonDecode(res.body)['places'] as List;
         if (places.isNotEmpty) {

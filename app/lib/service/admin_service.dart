@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../const/model/report.dart';
 import '../const/value/constants.dart';
+import 'api_client.dart';
 
 /// 관리자 기능 (ADM-01~07): 검토, 수거 작업 생성/진행, 재고 등록
 class AdminService {
@@ -67,12 +67,10 @@ class AdminService {
     required int vehicleCapacity,
     required int workMinutes,
   }) async {
-    // 1) 최적화 서버 호출
-    final res = await http
-        .post(
-          Uri.parse(kOptimizeUrl),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
+    // 1) 최적화 서버 호출 (로그인 토큰 첨부 — 서버가 인증을 요구함)
+    final res = await ApiClient.postJson(
+      Uri.parse(kOptimizeUrl),
+      jsonEncode({
             'depot': {'lat': depotLat, 'lng': depotLng},
             if (returnLat != null && returnLng != null)
               'return_to': {'lat': returnLat, 'lng': returnLng},
@@ -93,9 +91,13 @@ class AdminService {
                           r.reportedAt.toUtc().toIso8601String(),
                     })
                 .toList(),
-          }),
-        )
-        .timeout(const Duration(seconds: 30));
+      }),
+      timeout: const Duration(seconds: 30),
+    );
+    if (res.statusCode == 401) throw Exception(ApiClient.authErrorMessage);
+    if (res.statusCode == 429) {
+      throw Exception('요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.');
+    }
     if (res.statusCode != 200) {
       // 서버가 설명을 준 경우 그대로 보여준다(예: 용량/시간 초과 안내)
       String msg = '서버 오류(${res.statusCode})';

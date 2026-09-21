@@ -77,6 +77,11 @@ analysis-server/**/cache/
 docs/images/
 *.zip
 
+# 공개 저장소에 두지 않는 내부 문서 (의뢰자 계정 전략 등)
+docs/배포_의뢰자_요청사항.md
+docs/BIKELOOP_인수인계*.md
+_private/
+
 # ---------- OS / 에디터 ----------
 .DS_Store
 Thumbs.db

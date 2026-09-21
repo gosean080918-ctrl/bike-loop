@@ -5,7 +5,7 @@ BikeReclaim 서버 — /optimize(v2: 이강혁 엔진) + /address + /search.
 import os
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 
 try:
     from dotenv import load_dotenv
@@ -13,21 +13,26 @@ try:
 except ImportError:
     pass
 
+from auth import require_user
 from models import OptimizeRequest, OptimizeResponse
 from optimizer import optimize
 
-app = FastAPI(title="BikeReclaim Optimizer", version="0.3.0")
+app = FastAPI(title="BIKE LOOP Optimizer", version="0.4.0")
 
 KAKAO_REST_KEY = os.getenv("KAKAO_REST_KEY", "")
 
 
+# /health 만 공개 — 배포 상태 확인용이며 키를 쓰지 않는다.
+# 나머지는 전부 로그인한 앱 사용자만 호출할 수 있다(auth.require_user).
 @app.get("/health")
 def health() -> dict:
     return {"ok": True}
 
 
 @app.get("/address")
-def reverse_geocode(lat: float, lng: float) -> dict:
+def reverse_geocode(
+    lat: float, lng: float, _user: str = Depends(require_user)
+) -> dict:
     if not KAKAO_REST_KEY:
         raise HTTPException(501, "KAKAO_REST_KEY not set")
     r = httpx.get(
@@ -48,7 +53,9 @@ def reverse_geocode(lat: float, lng: float) -> dict:
 
 
 @app.get("/search")
-def keyword_search(q: str, size: int = 7) -> dict:
+def keyword_search(
+    q: str, size: int = 7, _user: str = Depends(require_user)
+) -> dict:
     if not KAKAO_REST_KEY:
         raise HTTPException(501, "KAKAO_REST_KEY not set")
     r = httpx.get(
@@ -75,7 +82,9 @@ def keyword_search(q: str, size: int = 7) -> dict:
 
 
 @app.post("/optimize", response_model=OptimizeResponse)
-def run_optimize(req: OptimizeRequest) -> OptimizeResponse:
+def run_optimize(
+    req: OptimizeRequest, _user: str = Depends(require_user)
+) -> OptimizeResponse:
     if not req.stops:
         raise HTTPException(400, "stops is empty")
     if len(req.stops) > 200:

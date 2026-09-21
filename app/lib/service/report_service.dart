@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../const/model/report.dart';
 import '../const/value/constants.dart';
+import 'api_client.dart';
 
 /// RPT-04 신고 제출, RPT-05/06 조회, 중복 확인 RPC
 class ReportService {
@@ -38,9 +38,10 @@ class ReportService {
   /// 좌표 → 주소 (서버 프록시 경유, 실패 시 null — 표시는 좌표로 폴백)
   Future<String?> reverseGeocode(double lat, double lng) async {
     try {
-      final res = await http
-          .get(Uri.parse('$kAddressUrl?lat=$lat&lng=$lng'))
-          .timeout(const Duration(seconds: 5));
+      final res = await ApiClient.get(
+        Uri.parse('$kAddressUrl?lat=$lat&lng=$lng'),
+        timeout: const Duration(seconds: 5),
+      );
       if (res.statusCode != 200) return null;
       return (jsonDecode(res.body) as Map<String, dynamic>)['address']
           as String?;
