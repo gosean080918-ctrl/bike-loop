@@ -48,7 +48,7 @@ app/                Flutter 앱
   lib/ui/route|tab/ 화면
 server/             FastAPI (/optimize · /address · /search)
   engine.py         핫스팟 클러스터링 + 긴급도 + CVRP
-supabase/           스키마 · RLS · RPC · 마이그레이션 SQL (01~06 순서로 적용)
+supabase/           스키마 · RLS · RPC · 마이그레이션 SQL (01~07 순서로 적용)
 analysis-server/    NYC 311 데이터로 방법론 검증한 PoC
 docs/               대회용 설명서(HTML)
 blueprint.txt       ★ 단일 진실 원천 — 기능 목록 · 설계 결정 · 작업 로그
@@ -70,7 +70,8 @@ blueprint.txt       ★ 단일 진실 원천 — 기능 목록 · 설계 결정 
 ## 실행
 
 ### 1. 데이터베이스
-Supabase 프로젝트 생성 후 SQL Editor에서 `supabase/` 안의 파일을 **01 → 06 순서**로 실행합니다.
+Supabase 프로젝트 생성 후 SQL Editor에서 `supabase/` 안의 파일을 **01 → 07 순서**로 실행합니다.
+(07은 일반 공개용 보안 강화 — 사진 열람 제한, 신고 도배 방지)
 
 ### 2. 서버 (선택 — 이미 Cloud Run에 배포되어 있음)
 ```bash
