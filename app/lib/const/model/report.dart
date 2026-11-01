@@ -1,14 +1,14 @@
-/// 방치 자전거 신고 (supabase/01_schema.sql reports 테이블과 1:1)
+/// An abandoned-bicycle report; maps 1:1 to the reports table in supabase/01_schema.sql
 class Report {
   final String id;
   final String reporterId;
-  final String photoPath; // Storage 경로 (photo_url 컬럼) - 표시할 땐 signed URL 생성
+  final String photoPath; // Storage path (photo_url column); a signed URL is made for display
   final double lat;
   final double lng;
   final String? address;
-  final String condition; // kConditionLabels 키 (5종)
+  final String condition; // one of the five kConditionLabels keys
   final String description;
-  final String status; // kStatusLabels 키
+  final String status; // a kStatusLabels key
   final String? duplicateOf;
   final int priority;
   final DateTime reportedAt;
@@ -51,7 +51,7 @@ class Report {
         jobId: m['job_id'] as String?,
       );
 
-  /// insert용 (id/status/reported_at은 DB 기본값 사용)
+  /// For inserts: id, status and reported_at come from the database defaults
   static Map<String, dynamic> insertMap({
     required String reporterId,
     required String photoPath,
@@ -72,7 +72,7 @@ class Report {
       };
 }
 
-/// 중복 확인 RPC(find_nearby_reports) 결과 행
+/// One row returned by the duplicate-check RPC (find_nearby_reports)
 class NearbyReport {
   final String id;
   final double lat;

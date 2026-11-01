@@ -5,7 +5,7 @@ import '../../const/value/app_theme.dart';
 import '../../const/value/constants.dart';
 import '../../state_management/providers.dart';
 
-/// ADM-09: 대시보드 — 수거 실적 + 순환(재생) 성과 + 운영 효율
+/// ADM-09: dashboard — collection output, reuse performance, operating efficiency
 class AdminDashboardTab extends ConsumerWidget {
   const AdminDashboardTab({super.key});
 
@@ -31,7 +31,7 @@ class AdminDashboardTab extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
             children: [
-              // ── 핵심 지표 4개 ──
+              // -- The four headline metrics --
               Row(children: [
                 _metric('Reports', '${d['reportTotal']}',
                     AppColors.primarySoft, AppColors.primary),
@@ -54,7 +54,7 @@ class AdminDashboardTab extends ConsumerWidget {
               ]),
               const SizedBox(height: 20),
 
-              // ── 순환 성과 (대회 어필 포인트) ──
+              // -- Reuse performance --
               _card(
                 title: 'Circulation',
                 child: Column(
@@ -84,7 +84,7 @@ class AdminDashboardTab extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    // 재생 vs 폐기 비율 바
+                    // Reuse vs disposal ratio bar
                     ClipRRect(
                       borderRadius: BorderRadius.circular(6),
                       child: SizedBox(
@@ -113,7 +113,7 @@ class AdminDashboardTab extends ConsumerWidget {
               ),
               const SizedBox(height: 14),
 
-              // ── 재고 상태 ──
+              // -- Inventory state --
               _card(
                 title: 'Inventory (${d['bikeTotal']} total)',
                 child: Column(
@@ -126,7 +126,7 @@ class AdminDashboardTab extends ConsumerWidget {
               ),
               const SizedBox(height: 14),
 
-              // ── 신고 처리 현황 ──
+              // -- Report processing status --
               _card(
                 title: 'Report status',
                 child: Column(
@@ -140,7 +140,7 @@ class AdminDashboardTab extends ConsumerWidget {
               ),
               const SizedBox(height: 14),
 
-              // ── 신고 유형 분포 ──
+              // -- Distribution of report types --
               _card(
                 title: 'Report types',
                 child: Column(
@@ -154,7 +154,7 @@ class AdminDashboardTab extends ConsumerWidget {
               ),
               const SizedBox(height: 14),
 
-              // ── 운영 효율 ──
+              // -- Operating efficiency --
               _card(
                 title: 'Efficiency',
                 child: Column(

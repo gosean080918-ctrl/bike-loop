@@ -7,18 +7,18 @@ import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 import '../../const/value/app_theme.dart';
 import '../../utils/romanize.dart';
 
-/// 수거 동선 (Claude Design 시안 ④):
-/// 번호 원형 핀(초록, 흰 테두리) + 점선 경로 + 하단 방문 순서 카드
+/// Collection route (mockup screen 4):
+/// numbered round pins (green, white border), a dashed path, and a visit-order card below
 class RouteMapScreen extends StatefulWidget {
   final double depotLat;
   final double depotLng;
 
-  /// [{seq, lat, lng, label}] — seq 오름차순
+  /// [{seq, lat, lng, label}], ordered by ascending seq
   final List<Map<String, dynamic>> stops;
 
-  /// 카카오모빌리티 도로 경로.
-  /// ① 구간별: [[[lat,lng],...], [[lat,lng],...]]  ← 구간마다 색 다름
-  /// ② 단일: [[lat,lng], ...]                     ← 하위호환
+  /// Road route from Kakao Mobility.
+  /// (a) per leg: [[[lat,lng],...], [[lat,lng],...]]  <- each leg gets its own colour
+  /// (b) single:  [[lat,lng], ...]                   <- kept for backwards compatibility
   final List<dynamic>? roadPolyline;
 
   const RouteMapScreen({
@@ -70,7 +70,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     return 9;
   }
 
-  /// 시안 핀: 원형 + 흰 테두리 + 그림자, SVG를 data URI로 마커 이미지에 주입
+  /// Mockup pin: circle, white border, shadow; the SVG is injected as a data URI marker image
   String _pinDataUri(String text, String bg, String fg,
       {double fontSize = 17}) {
     final svg = '''
@@ -97,7 +97,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       ),
     };
     for (final s in widget.stops) {
-      // 핀 라벨은 짧아야 하므로 시도·시군구를 떼고 로마자로 표시
+      // Pin labels must be short: drop the province and city, then transliterate
       final short = romanizeAddress(((s['label'] as String?) ?? '')
           .replaceFirst('제주특별자치도 ', '')
           .replaceFirst('제주시 ', '')
@@ -110,7 +110,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         height: 48,
         offsetX: 24,
         offsetY: 24,
-        // 핀 옆 주소 라벨 (말풍선 상시 표시)
+        // Address label beside the pin, as an always-visible info window
         infoWindowContent:
             '<div style="padding:3px 8px;font-size:12px;font-weight:600;'
             'color:#17261D;white-space:nowrap;">$short</div>',
@@ -124,13 +124,13 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     });
   }
 
-  /// 구간별 색 (출발→① 연한색 → 마지막 구간 진한색으로 그라데이션)
+  /// Per-leg colours, shading from light on the first leg to dark on the last
   static const List<Color> _segColors = [
-    Color(0xFF6FCF97), // 1구간 — 연한 초록
+    Color(0xFF6FCF97), // leg 1 — light green
     Color(0xFF3BAF6B), //
-    Color(0xFF1B7742), // 브랜드 그린
+    Color(0xFF1B7742), // brand green
     Color(0xFF11603A), //
-    Color(0xFF0B4A2C), // 마지막 — 진한 초록
+    Color(0xFF0B4A2C), // last — dark green
   ];
 
   Color _segColor(int i, int total) {
@@ -143,7 +143,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   List<Polyline> _buildPolylines() {
     final road = widget.roadPolyline;
     if (road == null || road.isEmpty) {
-      // 도로 경로 없음 — 순서만 점선으로
+      // No road route available: draw the visit order as a dashed line
       return [
         Polyline(
           polylineId: 'route',
@@ -156,7 +156,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       ];
     }
 
-    // 구간별 형식인지(중첩 리스트) 판별
+    // Detect the per-leg format (a nested list)
     final first = road.first;
     final isSegmented = first is List && first.isNotEmpty && first.first is List;
 
@@ -186,7 +186,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           ],
           strokeColor: _segColor(i, road.length),
           strokeWidth: 6,
-          strokeOpacity: 0.85, // 겹치는 구간은 색이 섮여 보임
+          strokeOpacity: 0.85, // overlapping legs blend visibly
           strokeStyle: StrokeStyle.solid,
         ),
     ];
@@ -253,7 +253,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               polylines: _polylines,
             ),
           ),
-          // 시안: 하단 방문 순서 영역
+          // Mockup: the visit-order area at the bottom
           Container(
             color: AppColors.bg,
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),

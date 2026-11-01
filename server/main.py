@@ -1,6 +1,7 @@
 """
-BikeReclaim 서버 — /optimize(v2: 이강혁 엔진) + /address + /search.
-카카오 REST 키/카카오모빌리티 키/OPT_* 튜닝값: .env (앱에는 절대 금지)
+BIKE LOOP server — /optimize (v2 engine) + /address + /search.
+Kakao REST key, Kakao Mobility key and OPT_* tuning values live in .env only;
+they must never be shipped inside the app.
 """
 import os
 
@@ -22,8 +23,8 @@ app = FastAPI(title="BIKE LOOP Optimizer", version="0.4.0")
 KAKAO_REST_KEY = os.getenv("KAKAO_REST_KEY", "")
 
 
-# /health 만 공개 — 배포 상태 확인용이며 키를 쓰지 않는다.
-# 나머지는 전부 로그인한 앱 사용자만 호출할 수 있다(auth.require_user).
+# Only /health is public: it reports deployment status and touches no API key.
+# Everything else is restricted to signed-in app users (see auth.require_user).
 @app.get("/health")
 def health() -> dict:
     return {"ok": True}
@@ -92,12 +93,12 @@ def run_optimize(
     try:
         return optimize(req)
     except RuntimeError as e:
-        # 필수 방문 지점이 용량/시간 제약을 넘을 때 주로 발생
+        # Usually raised when mandatory stops exceed capacity or working time
         raise HTTPException(
             422,
-            "선택한 지점을 모두 돌 수 없습니다. "
-            "차량 적재량이나 작업시간을 늘리거나 수거 대상을 줄여주세요. "
-            f"(상세: {e})",
+            "The selected stops cannot all be visited. "
+            "Increase vehicle capacity or working time, or select fewer stops. "
+            f"(detail: {e})",
         ) from e
     except ValueError as e:
         raise HTTPException(422, str(e)) from e

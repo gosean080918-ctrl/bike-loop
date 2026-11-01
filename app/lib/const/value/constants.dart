@@ -1,53 +1,56 @@
-/// 앱 전역 상수.
+/// Application-wide constants.
 ///
-/// [보안 원칙 - blueprint 섹션1]
-/// 여기 넣어도 되는 키: Supabase anon key(RLS 전제), 카카오맵 JS 키(번들 제한).
-/// service_role 키, 카카오 REST 키는 절대 금지.
+/// [Security rule — see the engineering log]
+/// Keys that may live here: the Supabase anon key (RLS enforces access) and the
+/// Kakao Maps JS key (restricted to registered domains). The service_role key and the
+/// Kakao REST key must never appear here.
 library;
 
-/// Supabase (프로젝트: bikereclaim1, Seoul)
+/// Supabase (project: bikereclaim1, Seoul)
 const String kSupabaseUrl = 'https://xpkifseyiphyvoppcsui.supabase.co';
 
-/// Publishable key (anon 역할, RLS 전제 — 앱에 포함 가능)
+/// Publishable key (anon role; safe to ship because RLS enforces access)
 const String kSupabaseAnonKey = 'sb_publishable_JNTxRVuSMHQV1-aoL7tOLg_gc6e8Cn-';
 
-/// 카카오맵 JavaScript 키 (앱: Bike Loop, ID 1622635 — 2026-10-26 재발급)
-/// ※ 이전 앱(ID 1514725)이 콘솔에서 사라져 모든 화면에서 지도가 뜨지 않았다.
-///   새 앱을 만들고 키를 교체함. Web 플랫폼(http://localhost) 등록과
-///   카카오맵 활성화가 되어 있어야 지도가 로드된다.
+/// Kakao Maps JavaScript key (app: Bike Loop, ID 1622635, reissued 2026-10-26)
+/// NOTE: the previous app (ID 1514725) vanished from the Kakao console, and every map
+///   in the app went blank. A new app was created and the key replaced. The map only
+///   loads if the Web platform (http://localhost) is registered and Kakao Map is enabled.
 const String kKakaoJsKey = 'f143629fbc328db1b57a03365760a430';
 
-/// 사진 버킷 이름
+/// Name of the photo bucket
 const String kPhotoBucket = 'report-photos';
 
-/// 백엔드 서버 — Google Cloud Run 배포본 (2026-08-02)
-/// 프로젝트: bikeloop-504502 / 리전: asia-northeast3(서울)
-/// 재배포: server/ 폴더에서
+/// Backend server, deployed on Google Cloud Run (2026-08-02)
+/// Project: bikeloop-504502, region asia-northeast3 (Seoul)
+/// To redeploy, run this from the server/ directory:
 ///   gcloud run deploy bikeloop-server --source . --region asia-northeast3 ...
-/// ※ 로컬 서버로 개발할 땐 아래 주석을 바꿔 쓴다
-///   (에뮬레이터는 10.0.2.2 = PC의 localhost)
+/// NOTE: when developing against a local server, swap in the commented line below
+///   (on the Android emulator, 10.0.2.2 is the host machine's localhost)
 const String kServerBase =
     'https://bikeloop-server-775952432199.asia-northeast3.run.app';
-// const String kServerBase = 'http://10.0.2.2:8000'; // 로컬 개발용
+// const String kServerBase = 'http://10.0.2.2:8000'; // local development
 const String kOptimizeUrl = '$kServerBase/optimize';
 const String kAddressUrl = '$kServerBase/address';
 const String kSearchUrl = '$kServerBase/search';
 
-/// ⚠ demo-en 브랜치 — 영어 시연 영상 전용 설정
-/// 기능·서비스 범위는 main과 동일한 '전국'이고, 화면 문구만 영어다.
-/// 시연이 끝나면 main 브랜치로 돌아갈 것.
+/// English build: the UI is in English.
+/// Features and service area are unchanged — nationwide within South Korea.
+/// Korean place names returned by the API are transliterated for display (utils/romanize.dart).
 
-/// 기본 지도 중심: 대한민국 중심부 (전국 서비스)
-/// GPS를 얻으면 그 위치로, 못 얻으면 이 좌표로 지도를 연다.
+/// Default map centre: the middle of South Korea (the service covers the whole country)
+/// The map opens on the GPS position when one is available, and on this point otherwise.
 const double kDefaultLat = 36.3400;
 const double kDefaultLng = 127.7700;
 
-/// 지도 축척: 낮을수록 확대. 내 위치가 있으면 kNearMapLevel, 없으면 전국 뷰
-const int kDefaultMapLevel = 12; // 전국이 한 화면에 들어오는 수준
-const int kNearMapLevel = 4; // 내 위치 주변 (동네 수준)
+/// Map zoom: lower means closer. kNearMapLevel when the user's position is known,
+/// the nationwide view otherwise.
+const int kDefaultMapLevel = 12; // the whole country fits on screen
+const int kNearMapLevel = 4; // around the user, roughly neighbourhood scale
 
-/// 서비스 지역: 대한민국 전역
-/// (카카오맵은 국외 타일이 없어 해외 좌표는 흰 화면이 되므로 경계로 막는다)
+/// Service area: all of South Korea
+/// (Kakao Maps has no tiles outside Korea, so foreign coordinates render blank —
+/// the bounds check blocks them)
 const double kKoreaMinLat = 33.0;
 const double kKoreaMaxLat = 38.7;
 const double kKoreaMinLng = 124.5;
@@ -61,12 +64,12 @@ bool isInKorea(double lat, double lng) =>
 
 const String kOutOfServiceMsg = 'Outside the service area (South Korea)';
 
-/// 기본 출발지/보관소 — 지역별 기본값은 const/value/regions.dart 참조.
-/// ※ 주소 문자열은 카카오 검색 질의에 그대로 쓰이므로 한글이어야 한다.
-///   화면에 보일 때는 romanize.dart가 로마자로 바꿔준다.
+/// Default depot. Per-region defaults live in const/value/regions.dart.
+/// NOTE: this address string is sent verbatim to Kakao's search API, so it must stay
+///   in Korean. It is transliterated by romanize.dart only when displayed.
 const String kDefaultDepotAddress = '세종특별자치시 한누리대로 2130';
 
-/// 자전거 상태 유형 (DB condition 값 ↔ 표시 라벨)
+/// Bicycle condition types: database `condition` value -> display label
 const Map<String, String> kConditionLabels = {
   'long_term': 'Long-abandoned',
   'damaged': 'Damaged',
@@ -75,7 +78,7 @@ const Map<String, String> kConditionLabels = {
   'other': 'Other',
 };
 
-/// 재고 상태 (bikes.state ↔ 표시 라벨)
+/// Inventory state: bikes.state -> display label
 const Map<String, String> kBikeStateLabels = {
   'storage': 'Stored',
   'repair': 'Repair',
@@ -84,7 +87,7 @@ const Map<String, String> kBikeStateLabels = {
   'disposal': 'Disposed',
 };
 
-/// 신고 처리 상태 (DB status 값 ↔ 표시 라벨)
+/// Report processing state: database `status` value -> display label
 const Map<String, String> kStatusLabels = {
   'submitted': 'Submitted',
   'approved': 'Approved',

@@ -1,8 +1,8 @@
 """
-PoC 3 — 시계열 탐색 (월별 신고량, 2020-01 ~ 2021-09)
-21개월뿐이라 SARIMA 적합 대신 계절 프로파일(월별 평균) 확인.
-결론 도출용: 계절성 존재 여부 + 제주 적용 시 '졸업 시즌' 이벤트 회귀변수 근거.
-출력: monthly_trend.png
+PoC 3 — time-series exploration of monthly report volume (2020-01 to 2021-09)
+With only 21 months available, a seasonal profile (monthly means) is examined instead of fitting SARIMA.
+Purpose: establish whether seasonality exists, and whether a graduation-season event regressor would be justified.
+Output: monthly_trend.png
 """
 import pandas as pd
 import matplotlib

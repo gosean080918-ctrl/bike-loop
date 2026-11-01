@@ -1,30 +1,32 @@
-/// 전국 확장 — 시도(광역자치단체) 17곳과 지역별 기본 보관소.
+/// Nationwide coverage: the 17 first-level administrative regions and each one's default depot.
 ///
-/// [설계 배경]
-/// - 서비스 지역을 제주 → 전국으로 확대(2026-08-12).
-/// - 수거 차량의 출발지(보관소) 기본값은 **도청 / 특별·광역시청**.
-///   실제 운영에서는 시군구 차고지가 맞지만, 전국 표준 좌표가 필요해
-///   우선 시도 대표 청사를 기본값으로 둔다. 관리자가 지도에서 바꿀 수 있다.
-/// - ⚠ 경기·경북처럼 넓은 도는 도청 한 곳만으로는 왕복 거리가 커서
-///   경로 생성이 거부되거나 작업시간 초과가 날 수 있다.
-///   → 그 경우 관리자가 작업 탭에서 가까운 차고지로 출발지를 바꿔야 한다.
+/// [Background]
+/// - The service area was extended from Jeju to the whole country (2026-08-12).
+/// - The collection vehicle's default start point is the **provincial office**, or the
+///   **city hall** for a metropolitan city. In real operation a municipal depot would be
+///   more accurate, but a standard nationwide coordinate was needed, so the regional
+///   office is the default. An administrator can change it on the map.
+/// - NOTE: in large provinces such as Gyeonggi or Gyeongbuk, a single provincial office
+///   can make the round trip long enough that route generation is refused or the working
+///   time is exceeded. In that case the administrator should move the start point to a
+///   nearer depot from the jobs tab.
 library;
 
 class RegionDepot {
-  /// 표준 시도명 (DB 저장값). 예: '경기도', '서울특별시'
+  /// Canonical region name, as stored in the database
   final String name;
 
-  /// 화면 표시용 짧은 이름. 예: '경기', '서울'
+  /// Short name for display
   final String short;
 
-  /// 기본 보관소 이름. 예: '경기도청'
+  /// Name of the default depot, e.g. the provincial office
   final String depotName;
 
-  /// 기본 보관소 주소 (주소 검색으로 좌표 재확인 가능)
+  /// Address of the default depot; its coordinates can be re-resolved by address search
   final String depotAddress;
 
-  /// 기본 보관소 좌표 (근사값 — 앱은 우선 서버 검색으로 정확한 좌표를 얻고,
-  /// 서버가 응답하지 않을 때 이 값으로 폴백한다)
+  /// Approximate coordinates of the default depot. The app resolves exact ones by server
+  /// search first and falls back to these when the server does not respond.
   final double lat;
   final double lng;
 
@@ -38,7 +40,8 @@ class RegionDepot {
   });
 }
 
-/// 시도 17곳 (특별시 1 · 광역시 6 · 특별자치시 1 · 도 6 · 특별자치도 3)
+/// All 17 regions: 1 special city, 6 metropolitan cities, 1 special self-governing city,
+/// 6 provinces, 3 special self-governing provinces
 const List<RegionDepot> kRegions = [
   RegionDepot(
       name: '서울특별시',
@@ -161,9 +164,9 @@ const List<RegionDepot> kRegions = [
       lng: 126.4983),
 ];
 
-/// 주소 앞부분에 나타날 수 있는 표기 → 표준 시도명
-/// 카카오 API는 '서울특별시'로 주는 경우와 '서울'로 주는 경우가 모두 있고,
-/// 강원/전북은 2023~2024년에 '특별자치도'로 바뀌어 옛 표기도 함께 받아준다.
+/// Variant spellings that can appear at the start of an address, mapped to the canonical name.
+/// The Kakao API returns both the full and the short form, and Gangwon and Jeonbuk were
+/// renamed in 2023-2024, so their older spellings are accepted too.
 const Map<String, String> kRegionAliases = {
   '서울': '서울특별시',
   '서울특별시': '서울특별시',
@@ -205,9 +208,9 @@ const Map<String, String> kRegionAliases = {
   '제주특별자치도': '제주특별자치도',
 };
 
-/// 주소 문자열 → 표준 시도명. 알 수 없으면 null.
-/// 예) '제주특별자치도 서귀포시 대정읍 동일리 2855-2' → '제주특별자치도'
-///     '경기 수원시 팔달구 ...'                      → '경기도'
+/// Address string -> canonical region name; null when it cannot be determined.
+/// (The Korean literals below are matched against addresses returned by Kakao and must
+///  stay in Korean; they are transliterated only for display, in utils/romanize.dart.)
 String? regionOf(String? address) {
   if (address == null) return null;
   final first = address.trim().split(RegExp(r'\s+')).firstOrNull;
@@ -215,8 +218,8 @@ String? regionOf(String? address) {
   return kRegionAliases[first];
 }
 
-/// 주소 문자열 → 시군구(두 번째 토큰). 예) '수원시', '강남구', '무안군'
-/// 관리번호와 통계 집계에 쓴다.
+/// Address string -> the city, county or district (its second token).
+/// Used in ID numbers and in statistics.
 String? districtOf(String? address) {
   if (address == null) return null;
   final parts = address.trim().split(RegExp(r'\s+'));
@@ -224,7 +227,7 @@ String? districtOf(String? address) {
   return parts[1];
 }
 
-/// 표준 시도명 → 기본 보관소 정보
+/// Canonical region name -> that region's default depot
 RegionDepot? depotOf(String? regionName) {
   if (regionName == null) return null;
   for (final r in kRegions) {
@@ -233,7 +236,7 @@ RegionDepot? depotOf(String? regionName) {
   return null;
 }
 
-/// 좌표 → 가장 가까운 시도 대표 청사 (주소를 못 얻었을 때의 폴백)
+/// Coordinates -> the nearest regional office; the fallback when no address is available
 RegionDepot nearestRegion(double lat, double lng) {
   var best = kRegions.first;
   var bestD = double.infinity;

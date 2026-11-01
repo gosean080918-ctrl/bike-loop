@@ -6,7 +6,7 @@ import '../../const/value/regions.dart';
 import '../../state_management/providers.dart';
 import 'location_picker_screen.dart';
 
-/// 선택 결과 (좌표 + 주소)
+/// The chosen result: coordinates and address
 class DepotPick {
   final double lat;
   final double lng;
@@ -14,19 +14,19 @@ class DepotPick {
   const DepotPick(this.lat, this.lng, this.address);
 }
 
-/// 보관소(출발지/복귀지) 선택 화면 — 전국 확장(2026-08-12)
+/// Depot picker for the start and return points, added with nationwide coverage (2026-08-12)
 ///
-/// 지역이 17곳으로 늘어나 한 줄짜리 '변경' 링크로는 고르기 어려워서
-/// 목록 화면으로 분리했다. 시도 대표 청사에서 고르거나,
-/// 지도에서 직접 찍어 차고지 주소를 쓸 수 있다.
+/// With 17 regions, a one-line "change" link was no longer usable, so this became a
+/// screen of its own. The user can pick a provincial or city office, or drop a pin on
+/// the map to use a depot address of their own.
 class DepotPickerScreen extends ConsumerStatefulWidget {
-  /// 화면 제목 (출발지/복귀지)
+  /// Screen title (start point or return point)
   final String title;
 
-  /// 현재 설정된 주소 (체크 표시용)
+  /// The currently configured address, used to show the check mark
   final String currentAddress;
 
-  /// 지도 픽커의 시작 좌표
+  /// Starting coordinates for the map picker
   final double initialLat;
   final double initialLng;
 
@@ -59,7 +59,7 @@ class _DepotPickerScreenState extends ConsumerState<DepotPickerScreen> {
         .toList();
   }
 
-  /// 청사 주소 → 좌표 (서버 검색, 실패 시 내장 좌표)
+  /// Office address -> coordinates via server search, falling back to the built-in values
   Future<void> _pickRegion(RegionDepot r) async {
     setState(() => _busy = true);
     final resolved =
@@ -76,7 +76,7 @@ class _DepotPickerScreenState extends ConsumerState<DepotPickerScreen> {
     );
   }
 
-  /// 지도에서 직접 지정 (차고지 등 청사가 아닌 장소)
+  /// Pick directly on the map, for places that are not government offices
   Future<void> _pickOnMap() async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
@@ -105,7 +105,7 @@ class _DepotPickerScreenState extends ConsumerState<DepotPickerScreen> {
       appBar: AppBar(title: Text(widget.title)),
       body: Column(
         children: [
-          // 검색
+          // Search
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: TextField(
@@ -117,7 +117,7 @@ class _DepotPickerScreenState extends ConsumerState<DepotPickerScreen> {
               ),
             ),
           ),
-          // 지도에서 직접 선택
+          // Pick on the map
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
             child: OutlinedButton.icon(

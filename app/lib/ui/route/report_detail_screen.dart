@@ -9,18 +9,19 @@ import '../../const/value/app_theme.dart';
 import '../../const/value/constants.dart';
 import '../../utils/romanize.dart';
 
-/// ADM-10: 신고 상세 보기
+/// ADM-10: report detail view
 ///
-/// 검토 탭에서 카드를 탭하면 열린다. 사진을 크게 보고(핀치 확대 지원),
-/// 잘려 보이던 설명·주소·좌표를 전부 확인한 뒤 그 자리에서 승인/반려/중복 처리.
+/// Opened by tapping a card on the review tab. It shows the photo large (pinch to zoom)
+/// along with the full description, address and coordinates, and lets the admin approve,
+/// reject or mark as duplicate right there.
 ///
-/// 액션은 이 화면이 직접 수행하지 않고 `Navigator.pop(context, 'approve')`처럼
-/// 문자열을 돌려준다 → 호출한 탭이 기존 처리 로직을 그대로 재사용한다.
-/// (중복 처리는 후보 선택 다이얼로그가 필요해서 탭 쪽에 남겨두는 게 깔끔함)
+/// This screen performs no action itself; it returns a string via
+/// `Navigator.pop(context, 'approve')` so the calling tab reuses its existing handlers.
+/// (marking a duplicate needs a candidate-picker dialog, which is cleaner left in the tab)
 class ReportDetailScreen extends StatelessWidget {
   final Report report;
 
-  /// 검토 대기(submitted) 건에서만 하단 액션 바를 노출
+  /// The bottom action bar appears only for reports still awaiting review
   final bool showActions;
 
   const ReportDetailScreen({
@@ -43,11 +44,11 @@ class ReportDetailScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         children: [
-          // ── 사진 (탭하면 전체화면 확대) ──
+          // -- Photo; tap to open fullscreen --
           _Photo(path: r.photoPath),
           const SizedBox(height: 16),
 
-          // ── 유형 + 상태 ──
+          // -- Condition and status --
           Row(
             children: [
               Expanded(
@@ -69,7 +70,7 @@ class ReportDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
-          // ── 기본 정보 ──
+          // -- Basic details --
           _card(
             title: 'Report',
             child: Column(
@@ -85,14 +86,14 @@ class ReportDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // ── 신고자 (관리자만 조회 가능 — profiles RLS) ──
+          // -- Reporter; readable by admins only, enforced by RLS on profiles --
           _card(
             title: 'Reporter',
             child: _Reporter(reporterId: r.reporterId),
           ),
           const SizedBox(height: 12),
 
-          // ── 상세 설명 ──
+          // -- Description --
           _card(
             title: 'Description',
             child: Text(
@@ -109,7 +110,7 @@ class ReportDetailScreen extends StatelessWidget {
         ],
       ),
 
-      // ── 하단 액션 바 ──
+      // -- Bottom action bar --
       bottomNavigationBar: !showActions
           ? null
           : SafeArea(
@@ -224,11 +225,11 @@ class ReportDetailScreen extends StatelessWidget {
   }
 }
 
-/// 신고자 정보 — profiles에서 이메일/닉네임 조회.
+/// Reporter details: email and display name, read from profiles.
 ///
-/// 개인정보 메모: profiles_select 정책이 "본인 또는 관리자"만
-/// 허용하므로 일반 사용자에겐 애초에 내려오지 않는다(DB 레벨 차단).
-/// email 컴럼은 supabase/05_profile_email.sql 적용 후부터 채워진다.
+/// Privacy note: the profiles_select policy allows only "self or admin", so an ordinary
+/// user never receives this at all — it is blocked at the database level.
+/// The email column is populated once supabase/05_profile_email.sql has been applied.
 class _Reporter extends StatelessWidget {
   final String reporterId;
   const _Reporter({required this.reporterId});
@@ -248,7 +249,7 @@ class _Reporter extends StatelessWidget {
           return const _ReporterText('Loading…');
         }
         if (snap.hasError || snap.data == null) {
-          // 05_profile_email.sql 미적용이거나 권한 없음
+          // 05_profile_email.sql not applied, or no permission
           return const _ReporterText('(unavailable)');
         }
 
@@ -319,7 +320,7 @@ class _ReporterText extends StatelessWidget {
       style: const TextStyle(fontSize: 14, color: AppColors.muted));
 }
 
-/// 서명 URL을 한 번만 만들어서 인라인 표시 + 전체화면 확대에 함께 쓴다
+/// Creates the signed URL once and reuses it for both the inline image and the fullscreen view
 class _Photo extends StatelessWidget {
   final String path;
   const _Photo({required this.path});
@@ -416,7 +417,7 @@ class _Photo extends StatelessWidget {
       );
 }
 
-/// 전체화면 사진 뷰어 — 핀치 줌 / 더블탭 줌 / 드래그
+/// Fullscreen photo viewer: pinch zoom, double-tap zoom, drag to pan
 class _FullScreenPhoto extends StatefulWidget {
   final String url;
   const _FullScreenPhoto({required this.url});

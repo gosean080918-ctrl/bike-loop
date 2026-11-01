@@ -15,15 +15,15 @@ Future<void> main() async {
     anonKey: kSupabaseAnonKey,
   );
 
-  // 카카오맵 JS 키 (지도 표시 전용)
-  // ※ baseUrl(http://localhost)을 넣으면 웹뷰가 http 페이지로 취급되어
-  //    카카오 지도 본체 스크립트 로드가 차단되는 문제 확인(2026-07-19) — 넣지 말 것
+  // Kakao Maps JavaScript key (map display only)
+  // NOTE: passing baseUrl (http://localhost) makes the WebView treat this as an
+  //    http page, which blocks the main Kakao Maps script (found 2026-07-19) — do not set it
   AuthRepository.initialize(appKey: kKakaoJsKey);
 
   runApp(const ProviderScope(child: BikeReclaimApp()));
 }
 
-/// 전역 Supabase 클라이언트 접근자
+/// Global accessor for the Supabase client
 final supabase = Supabase.instance.client;
 
 class BikeReclaimApp extends StatelessWidget {

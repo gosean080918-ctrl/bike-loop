@@ -1,24 +1,24 @@
 -- ============================================================
--- BIKE LOOP — 일반 공개 대비 보안 강화 (2026-09-15)
--- 적용: Supabase 대시보드 > SQL Editor 에 붙여넣고 Run
--- 선행: 01 ~ 06 적용 완료
+-- BIKE LOOP — hardening pass before the public launch (2026-09-15)
+-- Apply: paste into Supabase > SQL Editor and run it
+-- Requires: 01 through 06 already applied
 -- ============================================================
--- 왜 필요한가
---   지금까지는 아는 사람만 쓰는 상태였지만, 앱을 일반에 공개하면
---   누구나 가입할 수 있게 된다. "로그인한 사람"이라는 조건만으로는
---   더 이상 충분한 보호가 되지 않는다.
+-- Why this exists
+--   Until now only people we knew could use the app. Once it is public,
+--   anyone can sign up, and "is signed in" stops being a meaningful
+--   protection on its own.
 --
--- 무엇을 바꾸나
---   1) 신고 사진: 지금은 로그인한 누구나 전부 열람 가능
---      → 본인이 올린 사진 + 관리자만 열람 가능
---   2) 사진 업로드: 용량/개수 폭주를 막기 위한 안내 (버킷 설정은 대시보드에서)
---   3) 신고 수정/삭제 권한 재확인
+-- What this changes
+--   1) Report photos: previously readable by any signed-in user
+--      -> now readable only by the uploader and administrators
+--   2) Photo uploads: notes on capping size and count (bucket settings live in the dashboard)
+--   3) Re-asserts who may edit or delete a report
 -- ============================================================
 
 -- ------------------------------------------------------------
--- 1) Storage: 신고 사진 열람 제한
---    경로 규칙이 report-photos/{uid}/{파일명} 이므로
---    폴더 첫 칸(uid)이 본인이면 본인 사진이다.
+-- 1) Storage: restrict who can read report photos
+--    Paths follow report-photos/{uid}/{filename}, so if the first
+--    folder segment is the caller's uid, the photo is theirs.
 -- ------------------------------------------------------------
 drop policy if exists photos_read on storage.objects;
 create policy photos_read on storage.objects
@@ -26,12 +26,12 @@ create policy photos_read on storage.objects
   using (
     bucket_id = 'report-photos'
     and (
-      (storage.foldername(name))[1] = auth.uid()::text  -- 본인이 올린 사진
-      or public.is_admin()                              -- 또는 관리자
+      (storage.foldername(name))[1] = auth.uid()::text  -- uploaded by this user
+      or public.is_admin()                              -- or an administrator
     )
   );
 
--- 업로드는 기존과 동일(본인 폴더에만) — 확인 차 재생성
+-- Upload rule is unchanged (own folder only); recreated here for clarity
 drop policy if exists photos_insert on storage.objects;
 create policy photos_insert on storage.objects
   for insert to authenticated
@@ -40,7 +40,7 @@ create policy photos_insert on storage.objects
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
--- 본인 사진 삭제 허용 (잘못 올린 사진 정리용). 관리자도 가능.
+-- Users may delete their own photos (to clean up a mistaken upload); admins may too.
 drop policy if exists photos_delete on storage.objects;
 create policy photos_delete on storage.objects
   for delete to authenticated
@@ -53,7 +53,7 @@ create policy photos_delete on storage.objects
   );
 
 -- ------------------------------------------------------------
--- 2) 신고 수정/삭제 — 관리자만 (이미 그렇지만 명시적으로 재확인)
+-- 2) Editing and deleting reports — administrators only (already true; restated explicitly)
 -- ------------------------------------------------------------
 drop policy if exists reports_update on public.reports;
 create policy reports_update on public.reports
@@ -67,8 +67,8 @@ create policy reports_delete on public.reports
   using (public.is_admin());
 
 -- ------------------------------------------------------------
--- 3) 신고 도배 방지 — 한 사람이 5분 안에 20건 넘게 올리지 못하게
---    (일반 공개 후 장난 신고 대량 유입 방지)
+-- 3) Flood protection — no more than 20 reports from one user in five minutes
+--    (guards against bulk prank reports once the app is public)
 -- ------------------------------------------------------------
 create or replace function public.check_report_flood()
 returns trigger
@@ -83,7 +83,7 @@ begin
      and reported_at > now() - interval '5 minutes';
 
   if v_recent >= 20 then
-    raise exception '짧은 시간에 너무 많이 신고했습니다. 잠시 후 다시 시도해주세요.';
+    raise exception 'Too many reports in a short time. Please try again shortly.';
   end if;
   return new;
 end;
@@ -95,23 +95,23 @@ create trigger reports_flood_guard
   for each row execute function public.check_report_flood();
 
 -- ------------------------------------------------------------
--- 4) 확인
+-- 4) Verification
 -- ------------------------------------------------------------
--- 정책 목록 보기
+-- List the policies
 -- select tablename, policyname, cmd
 --   from pg_policies
 --  where schemaname in ('public','storage')
 --  order by tablename, policyname;
 
 -- ============================================================
--- [대시보드에서 따로 해야 하는 설정]
+-- [Settings that must be changed in the dashboard]
 --  Storage > report-photos > Configuration
---    - Public bucket: OFF 유지 (반드시)
+--    - Public bucket: keep OFF (mandatory)
 --    - File size limit: 10MB
 --    - Allowed MIME types: image/*
 --
 --  Authentication > Providers > Email
---    - Confirm email: ON 권장 (장난 가입 감소)
+--    - Confirm email: ON recommended (cuts down on throwaway sign-ups)
 --  Authentication > Rate limits
---    - 기본값 유지 또는 강화
+--    - keep the defaults or tighten them
 -- ============================================================

@@ -1,10 +1,12 @@
 """
-/optimize 래퍼 v2 — 이강혁 프레임워크(engine.py) 기반.
+/optimize wrapper (v2) built on the optimization framework in engine.py.
 
-- 튜닝 파라미터는 환경변수(OPT_*)가 기본값, 요청 본문 값이 있으면 우선.
-- 이동시간/거리: 기본 하버사인. KAKAO_MOBILITY_KEY가 설정되면
-  최적 순서 확정 후 카카오모빌리티 다중경유지 API로 실제 도로
-  경로(폴리라인)·거리·시간을 받아 응답에 포함한다.
+- Tuning parameters default to environment variables (OPT_*); values in the
+  request body take precedence.
+- Travel time and distance use the haversine formula by default. When
+  KAKAO_MOBILITY_KEY is set, the finalized visiting order is sent to Kakao
+  Mobility's multi-waypoint directions API and the real road polyline, distance
+  and duration are returned with the response.
 """
 import math
 import os
@@ -30,7 +32,7 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-# ── 튜닝 파라미터 (server/.env 에서 변경 — 이강혁 README 참고) ──
+# ── Tuning parameters (override in server/.env; see ENGINE_README.md) ──
 OPT = {
     "cluster_radius_m": _env_float("OPT_CLUSTER_RADIUS_M", 30),
     "completion_bonus_ratio": _env_float("OPT_COMPLETION_BONUS_RATIO", 0.15),
@@ -48,7 +50,7 @@ KAKAO_MOBILITY_KEY = os.getenv("KAKAO_MOBILITY_KEY", "")
 
 
 def _parse_report_date(iso: str | None) -> str:
-    """ISO 문자열 → 'YYYY-MM-DD' (없으면 오늘 = 경과일 0)"""
+    """ISO string -> 'YYYY-MM-DD'. Missing value means today, i.e. zero days elapsed."""
     if iso:
         try:
             return iso[:10]
@@ -59,7 +61,7 @@ def _parse_report_date(iso: str | None) -> str:
 
 def optimize(req: OptimizeRequest, time_limit_s: int | None = None
              ) -> OptimizeResponse:
-    # ── 1) 입력 → 엔진 locations ──
+    # ── 1) Request payload -> engine locations ──
     ret = req.return_to or req.depot
     locations = [{
         "name": "Start",
@@ -78,7 +80,7 @@ def optimize(req: OptimizeRequest, time_limit_s: int | None = None
             pickup_minutes=OPT["pickup_minutes"],
         ))
         if s.required:
-            required_nodes.add(i)  # locations 인덱스 = i (0은 Start)
+            required_nodes.add(i)  # index into locations; 0 is the start node
     locations.append({
         "name": "Storage",
         "lat": ret.lat,
@@ -86,7 +88,7 @@ def optimize(req: OptimizeRequest, time_limit_s: int | None = None
         "report_date": None,
     })
 
-    # ── 2) 엔진 실행 ──
+    # ── 2) Run the engine ──
     result = engine.solve_bike_loop(
         locations=locations,
         start_index=0,
@@ -104,13 +106,13 @@ def optimize(req: OptimizeRequest, time_limit_s: int | None = None
         required_nodes=required_nodes or None,
     )
 
-    # ── 3) 앱 호환 응답으로 변환 ──
+    # ── 3) Convert to the response shape the app expects ──
     speed_mpm = (req.speed_kmh or OPT["average_speed_kmh"]) * 1000 / 60
     stops_out: list[RouteStop] = []
     seq = 0
     eta = 0.0
     prev = (req.depot.lat, req.depot.lng)
-    anchor_points = []  # 도로 경로용 경유지 (클러스터 대표점)
+    anchor_points = []  # waypoints for road routing (one per cluster)
 
     for cluster in result["selected_clusters"]:
         a_lat = locations[cluster["anchor_node"]]["lat"]
@@ -136,7 +138,7 @@ def optimize(req: OptimizeRequest, time_limit_s: int | None = None
     total_dist = int(result["distance_m"])
     total_min = int(result["route_minutes"])
 
-    # ── 4) 도로 경로 (카카오모빌리티, 키 있을 때만) ──
+    # ── 4) Road-following route (Kakao Mobility, only when a key is set) ──
     road_path = _fetch_road_path(
         req.depot, ret, anchor_points) if KAKAO_MOBILITY_KEY else None
     if road_path:
@@ -164,8 +166,8 @@ def optimize(req: OptimizeRequest, time_limit_s: int | None = None
 
 
 def _fetch_road_path(depot, ret, anchors: list[dict]) -> dict | None:
-    """카카오모빌리티 다중경유지 길찾기 → 도로 폴리라인/거리/시간.
-    실패하면 None (하버사인 결과 유지)."""
+    """Kakao Mobility multi-waypoint directions -> road polyline, distance, duration.
+    Returns None on failure, in which case the haversine estimate stands."""
     if not anchors:
         return None
     try:
@@ -174,7 +176,7 @@ def _fetch_road_path(depot, ret, anchors: list[dict]) -> dict | None:
             "destination": {"x": ret.lng, "y": ret.lat},
             "waypoints": [
                 {"x": a["lng"], "y": a["lat"], "name": f"stop{i+1}"}
-                for i, a in enumerate(anchors[:30])  # API 한도 30
+                for i, a in enumerate(anchors[:30])  # API accepts at most 30
             ],
             "priority": "RECOMMEND",
         }
@@ -193,9 +195,9 @@ def _fetch_road_path(depot, ret, anchors: list[dict]) -> dict | None:
         if route.get("result_code", 0) != 0:
             return None
 
-        # 도로 좌표(vertexes: [x,y,x,y,...]) 수집
-        # section 단위 = 구간(출발→①, ①→②, ...) 이므로 따로 보관해
-        # 앱이 구간별로 다른 색(그라데이션)을 그릴 수 있게 한다.
+        # Collect road coordinates (vertexes: [x, y, x, y, ...]).
+        # One section = one leg (depot->1, 1->2, ...), so legs are kept separate
+        # and the app can draw each in a different shade.
         pts: list[list[float]] = []
         segments: list[list[list[float]]] = []
         for sec in route.get("sections", []):
@@ -204,14 +206,14 @@ def _fetch_road_path(depot, ret, anchors: list[dict]) -> dict | None:
                 v = road.get("vertexes", [])
                 for i in range(0, len(v) - 1, 2):
                     seg.append([v[i + 1], v[i]])  # [lat, lng]
-            if len(seg) > 200:  # 구간당 최대 200점으로 샘플링
+            if len(seg) > 200:  # sample down to at most 200 points per leg
                 step = math.ceil(len(seg) / 200)
                 seg = seg[::step] + [seg[-1]]
             if seg:
                 segments.append(seg)
                 pts.extend(seg)
 
-        # 전체 폴리라인도 축소(하위호환)
+        # Also provide a reduced full polyline for backward compatibility
         if len(pts) > 600:
             step = math.ceil(len(pts) / 600)
             pts = pts[::step] + [pts[-1]]

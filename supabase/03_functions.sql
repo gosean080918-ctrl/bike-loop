@@ -1,13 +1,13 @@
 -- ============================================================
--- BikeReclaim — RPC 함수 + 통계 뷰 (BE-02, BE-04)
+-- BIKE LOOP — RPC functions and statistics views
 -- ============================================================
 
 -- ------------------------------------------------------------
--- BE-02: 중복 신고 탐색
--- 신규 신고 좌표 주변 radius_m 이내의 "살아있는" 신고 반환.
--- 앱에서 신고 제출 전 호출 → 결과 있으면 "이미 신고된 자전거인가요?" UI.
--- 관리자 검토 화면에서도 동일 함수 사용.
--- 사용: supabase.rpc('find_nearby_reports',
+-- Duplicate report detection
+-- Returns open reports within radius_m of the new report's coordinates.
+-- The app calls this before submitting; any result triggers the "already reported?" prompt.
+-- The admin review screen uses the same function.
+-- Usage: supabase.rpc('find_nearby_reports',
 --        {p_lat: 33.30, p_lng: 126.28, p_radius_m: 30})
 -- ------------------------------------------------------------
 create or replace function public.find_nearby_reports(
@@ -45,7 +45,7 @@ as $$
 $$;
 
 -- ------------------------------------------------------------
--- 지도 범위(바운딩박스) 내 신고 조회 — 지도 탭용
+-- Reports within a bounding box, used by the map tab
 -- ------------------------------------------------------------
 create or replace function public.reports_in_bounds(
   p_min_lat double precision, p_min_lng double precision,
@@ -63,7 +63,7 @@ as $$
 $$;
 
 -- ------------------------------------------------------------
--- BE-04: 통계 뷰 (대시보드가 직접 조회, security_invoker로 RLS 준수)
+-- Statistics views queried directly by the dashboard; security_invoker keeps RLS in force
 -- ------------------------------------------------------------
 create or replace view public.v_stats_daily
 with (security_invoker = true) as

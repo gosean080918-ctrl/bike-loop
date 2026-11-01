@@ -1,44 +1,71 @@
-# 단계0 PoC 결과 — NYC 311 방치 자전거 방법론 검증
+# Proof-of-concept results — validating the method on NYC 311 derelict-bicycle data
 
-실행일: 2026-07-14 | 데이터: NYC 311 (Socrata `erm2-nwe9`), complaint_type = 'Derelict Bicycle'
+Run on 2026-07-14 | Data: NYC 311 (Socrata `erm2-nwe9`), `complaint_type = 'Derelict Bicycle'`
 
-## 데이터
+## The data
 
-NYC는 2020-01 ~ 2021-09 기간에 'Derelict Bicycle'을 독립 신고 유형으로 운영했다. 총 2,930건 중 좌표 보유 2,743건을 사용했다. 컨텍스트/네트워크 제약으로 개별 좌표 대신 Socrata SoQL 서버측 집계로 약 111m(0.001°) 그리드 셀 1,651개에 집계해 내려받았다(`grid.csv`). 자치구별: 맨해튼 1,205 / 브루클린 1,188 / 퀸스 304 / 브롱크스 151 / 스태튼아일랜드 9.
+New York ran 'Derelict Bicycle' as its own complaint type from 2020-01 to 2021-09. Of the
+2,930 records, the 2,743 that carry coordinates were used. Context and network limits ruled
+out downloading individual points, so the data was aggregated server-side with Socrata SoQL
+into 1,651 grid cells of roughly 111 m (0.001°) and downloaded as `grid.csv`. By borough:
+Manhattan 1,205, Brooklyn 1,188, Queens 304, Bronx 151, Staten Island 9.
 
-## 1. 핫스팟 분석 (`hotspot_analysis.py`)
+## 1. Hotspot analysis (`hotspot_analysis.py`)
 
-가중 KDE(가우시안, bw=0.08)와 Getis-Ord Gi*(KNN k=8, 행표준화, 999 순열)를 적용했다.
+A weighted KDE (Gaussian, bw = 0.08) and Getis-Ord Gi\* (KNN with k = 8, row-standardized,
+999 permutations).
 
-결과: 99% 유의 핫스팟 7셀, 95% 7셀. 최상위 핫스팟은 브롱크스 Port Morris 인근(40.8315, -73.9285, 단일 셀 94건, z=4.04). KDE에서는 어퍼웨스트사이드, 이스트빌리지~로어맨해튼, 파크슬로프/프로스펙트하이츠 일대가 고밀도로 나타났다.
+Result: 7 cells significant at 99%, 7 more at 95%. The strongest hotspot is near Port Morris
+in the Bronx (40.8315, -73.9285) — 94 reports in a single cell, z = 4.04. The KDE additionally
+shows high density on the Upper West Side, from the East Village through lower Manhattan, and
+around Park Slope and Prospect Heights.
 
-산출물: `kde_heatmap.png`, `gistar_map.png`, `hotspots_top.csv`(상위 60셀)
+Outputs: `kde_heatmap.png`, `gistar_map.png`, `hotspots_top.csv` (top 60 cells)
 
-## 2. 수거 동선 최적화 (`vrp_routing.py`)
+## 2. Collection route optimization (`vrp_routing.py`)
 
-Gi* 상위 40셀을 수거 지점으로, 차량 3대 × 용량 60대, 하버사인 거리 행렬로 CVRP를 OR-Tools(GLS, 10초)로 풀었다. 용량 초과 지점은 방문 분할(최대 30대/방문), 총수요(224) > 총용량(180)이라 초과분은 수요 가중 페널티 disjunction으로 이월 처리했다.
+The top 40 Gi\* cells became collection stops. A CVRP with three vehicles of capacity 60 and a
+haversine distance matrix was solved with OR-Tools (guided local search, 10 s). Stops above
+vehicle capacity were split across visits (at most 30 bicycles per visit), and because total
+demand (224) exceeded total capacity (180), the remainder was carried over through
+demand-weighted penalty disjunctions.
 
-결과: 3대 모두 만차(60/60), 총 이동거리 82.1km (차량별 27.4 / 26.5 / 28.2 km), 수거 180/224대, 이월 22개 방문.
+Result: all three vehicles full (60/60), 82.1 km travelled in total (27.4 / 26.5 / 28.2 km per
+vehicle), 180 of 224 bicycles collected, 22 visits carried over.
 
-산출물: `routes.csv`, `vrp_routes.png`
+Outputs: `routes.csv`, `vrp_routes.png`
 
-## 3. 시계열 탐색 (`timeseries_check.py`)
+## 3. Time-series exploration (`timeseries_check.py`)
 
-월별 신고량(21개월)은 여름 피크(6월 평균 187건) / 겨울 저점(12월 평균 81건)의 뚜렷한 계절성을 보였다. 관측치가 21개뿐이라 SARIMA 적합 대신 월별 프로파일만 확인했다 — 계절성 존재 자체가 제주 적용 시 '졸업 시즌' 이벤트 회귀변수를 넣을 근거가 된다.
+Monthly report volume across the 21 months shows clear seasonality: a summer peak (June
+averaging 187 reports) and a winter trough (December averaging 81). With only 21 observations,
+a monthly profile was examined rather than fitting SARIMA — but the existence of seasonality is
+itself the argument for including a graduation-season event regressor in the Korean deployment.
 
-산출물: `monthly_trend.png`
+Output: `monthly_trend.png`
 
-## 결론 및 한계
+## Conclusions and limitations
 
-세 방법론(KDE/Gi* 핫스팟, CVRP 동선, 계절성) 모두 실제 공공데이터에서 의미 있는 결과를 냈다 — 앱 파이프라인(ANL-01~03)에 그대로 이식 가능.
+All three methods — KDE/Gi\* hotspots, CVRP routing, and seasonality — produced meaningful
+results on real public data, and transferred directly into the app's analysis pipeline.
 
-한계: (1) 그리드 집계라 개별 신고 시점×위치 결합 분석(시공간 핫스팟)은 못 했다 — 실서비스에선 원시 좌표 사용. (2) 거리 행렬이 직선거리 근사 — 실서비스는 카카오모빌리티 거리행렬. (3) Gi*가 희소 셀(n=1~2 다수)에서 보수적 — 제주처럼 좁은 지역에선 셀 크기 재조정 필요. (4) NYC 계절성(여름 피크)은 자전거 이용량 주기이고, 제주 국제학교 단지는 졸업/퇴실 주기라 패턴이 다를 수 있음 — 이벤트 기반 피처가 핵심.
+Limitations:
 
-## 재현 방법
+1. Because the data is grid-aggregated, a combined space-time hotspot analysis was not
+   possible. Production uses raw coordinates.
+2. The distance matrix approximates road distance with straight lines. Production uses the
+   Kakao Mobility distance matrix.
+3. Gi\* is conservative on sparse cells, of which there were many with n = 1 or 2. A smaller
+   service area needs its cell size re-tuned.
+4. New York's summer peak reflects the cycling season, whereas a campus area's cycle is
+   graduation and move-out. The patterns may differ, which is why event-based features matter
+   most.
+
+## Reproducing it
 
 ```
 pip install numpy pandas matplotlib scipy libpysal esda ortools
-python3 hotspot_analysis.py   # grid.csv 필요
-python3 vrp_routing.py        # hotspots_top.csv 필요
-python3 timeseries_check.py   # monthly.csv 필요
+python3 hotspot_analysis.py   # needs grid.csv
+python3 vrp_routing.py        # needs hotspots_top.csv
+python3 timeseries_check.py   # needs monthly.csv
 ```

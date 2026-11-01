@@ -1,27 +1,27 @@
 -- ============================================================
--- 04: 도로 경로 저장 + 재고 관리 확장 (2026-07-21, v2)
--- 관리번호 로직: {지역}_{수거일YYYYMMDD}_{순번3자리}
---   예) 서귀포시_20260721_001
---   지역 = 신고 주소의 두 번째 어절(시/군), 없으면 '제주'
--- SQL Editor에서 이 파일 전체를 실행하세요. (재실행해도 안전)
+-- 04: store road routes and extend inventory management
+-- ID number format: {district}_{collectionDateYYYYMMDD}_{3-digit sequence}
+--   e.g. Seogwipo-si_20260721_001
+--   district = second token of the report address; falls back to 'Jeju'
+-- Run this whole file in the SQL editor. Safe to re-run.
 -- ============================================================
 
--- 수거 작업에 도로 경로(카카오모빌리티 폴리라인) 저장
+-- Store the road polyline (from Kakao Mobility) on the collection job
 alter table public.collection_jobs
   add column if not exists route_polyline jsonb;
 
--- 재고: 관리번호 + 보관 장소
+-- Inventory: ID number and storage location
 alter table public.bikes
   add column if not exists code text unique;
 
 alter table public.bikes
   add column if not exists storage_location text not null default '';
 
--- (구버전 04를 적용했던 경우 대비) 예전 기본값/시퀀스 제거
+-- Drop the old default and sequence in case an earlier version of 04 was applied
 alter table public.bikes alter column code drop default;
 drop sequence if exists public.bike_code_seq;
 
--- 관리번호 자동 생성 트리거: {지역}_{YYYYMMDD}_{NNN}
+-- Trigger that generates the ID number: {district}_{YYYYMMDD}_{NNN}
 create or replace function public.gen_bike_code()
 returns trigger
 language plpgsql security definer set search_path = public
@@ -40,7 +40,7 @@ begin
   select address into v_addr
     from public.reports where id = new.report_id;
 
-  -- '제주특별자치도 서귀포시 안덕면 ...' → 두 번째 어절(시/군)
+  -- Take the second token of the address (the city or county)
   v_region := nullif(split_part(coalesce(v_addr, ''), ' ', 2), '');
   if v_region is null then
     v_region := '제주';
@@ -62,7 +62,7 @@ create trigger bikes_gen_code
   before insert on public.bikes
   for each row execute function public.gen_bike_code();
 
--- 기존 행(코드 없음 또는 구형식 BK-)에 새 형식 소급 부여
+-- Backfill the new format onto existing rows (no code, or the old BK- format)
 do $$
 declare
   r record;

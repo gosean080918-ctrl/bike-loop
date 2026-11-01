@@ -1,28 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// BikeReclaim 디자인 시스템 v2 — Claude Design 시안(BikeReclaim UI.html) 이식
-/// 토큰 출처: 시안의 인라인 스타일 (색/라운드/그림자/타이포)
+/// BIKE LOOP design system v2, ported from the design mockup (BikeReclaim UI.html)
+/// Tokens come from the mockup's inline styles: color, radius, shadow, typography
 class AppColors {
-  // 브랜드
-  static const brandTeal = Color(0xFF05A1A2); // BIKE LOOP 워드마크 색
+  // Brand
+  static const brandTeal = Color(0xFF05A1A2); // BIKE LOOP wordmark color
   static const primary = Color(0xFF1B7742);
   static const primaryPressed = Color(0xFF166438);
   static const primarySoft = Color(0xFFE9F3ED);
   static const accentOrange = Color(0xFFE8590C);
 
-  // 뉴트럴 (시안 그대로)
-  static const bg = Color(0xFFF7F9F7); // 화면 배경
+  // Neutrals, exactly as in the mockup
+  static const bg = Color(0xFFF7F9F7); // screen background
   static const card = Colors.white;
   static const border = Color(0xFFE3E8E4);
-  static const ink = Color(0xFF17261D); // 제목/본문
-  static const sub = Color(0xFF4A554E); // 보조 텍스트
-  static const muted = Color(0xFF8B958E); // 흐린 텍스트
-  static const faint = Color(0xFF9AA69E); // 플레이스홀더
+  static const ink = Color(0xFF17261D); // headings and body text
+  static const sub = Color(0xFF4A554E); // secondary text
+  static const muted = Color(0xFF8B958E); // dimmed text
+  static const faint = Color(0xFF9AA69E); // placeholder
   static const dateGray = Color(0xFFB0B9B3);
   static const chevron = Color(0xFFC6CEC9);
 
-  // 상태 배지 (시안: 처리중=주황, 완료=초록)
+  // Status badges (mockup: in-progress = orange, done = green)
   static const pendingBg = Color(0xFFFFF3E4);
   static const pendingFg = Color(0xFFC2620A);
   static const doneBg = Color(0xFFE9F3ED);
@@ -30,11 +30,11 @@ class AppColors {
   static const grayBg = Color(0xFFEEF1EE);
   static const grayFg = Color(0xFF6B7671);
 
-  // 그림자
-  static const shadowCard = Color(0x0F14281E); // rgba(20,40,30,0.06)쯤
+  // Shadow
+  static const shadowCard = Color(0x0F14281E); // roughly rgba(20,40,30,0.06)
   static const shadowCta = Color(0x471B7742); // rgba(27,119,66,0.28)
 
-  // 하위 호환 별칭 (기존 화면 코드용)
+  // Backwards-compatible aliases for older screen code
   static const textMain = ink;
   static const textSub = muted;
 }
@@ -66,7 +66,7 @@ ThemeData buildAppTheme() {
       iconTheme: IconThemeData(color: AppColors.sub),
     ),
 
-    // 시안 카드: 보더 없음 + 아주 부드러운 그림자, radius 20
+    // Mockup card: no border, very soft shadow, radius 20
     cardTheme: CardThemeData(
       color: AppColors.card,
       elevation: 3,
@@ -78,7 +78,7 @@ ThemeData buildAppTheme() {
       margin: EdgeInsets.zero,
     ),
 
-    // 시안 CTA: radius 18, 18px 굵은 글씨, 초록 그림자
+    // Mockup CTA: radius 18, 18px bold text, green shadow
     filledButtonTheme: FilledButtonThemeData(
       style: ButtonStyle(
         backgroundColor: WidgetStateProperty.resolveWith((s) =>
@@ -141,7 +141,7 @@ ThemeData buildAppTheme() {
       hintStyle: const TextStyle(color: AppColors.faint, fontSize: 15),
     ),
 
-    // 시안 칩: pill(100px), 선택=초록/흰, 비선택=흰+얇은 보더
+    // Mockup chip: pill (100px); selected = green on white, unselected = white with a thin border
     chipTheme: base.chipTheme.copyWith(
       backgroundColor: Colors.white,
       selectedColor: AppColors.primary,
@@ -198,15 +198,15 @@ ThemeData buildAppTheme() {
   );
 }
 
-/// 상태 → (배경, 글자) — 시안 배지 팔레트
+/// Status -> (background, foreground), from the mockup's badge palette
 (Color, Color) statusColors(String status) => switch (status) {
       'collected' => (AppColors.doneBg, AppColors.doneFg),
       'rejected' || 'duplicate' => (AppColors.grayBg, AppColors.grayFg),
-      // submitted/approved/scheduled = "처리중" 계열 (주황)
+      // submitted / approved / scheduled are the "in progress" family (orange)
       _ => (AppColors.pendingBg, AppColors.pendingFg),
     };
 
-/// 상태 배지 (시안: pill, 12px w700)
+/// Status badge (mockup: pill, 12px w700)
 class StatusChip extends StatelessWidget {
   final String label;
   final String status;
@@ -228,10 +228,10 @@ class StatusChip extends StatelessWidget {
   }
 }
 
-/// BIKE LOOP 워드마크 (Varela Round + #05A1A2)
+/// BIKE LOOP wordmark (Varela Round, #05A1A2)
 class BrandWordmark extends StatelessWidget {
   final double fontSize;
-  final String? suffix; // 예: '관리자'
+  final String? suffix; // e.g. 'Admin'
   const BrandWordmark({super.key, this.fontSize = 24, this.suffix});
 
   @override
@@ -263,7 +263,7 @@ class BrandWordmark extends StatelessWidget {
   }
 }
 
-/// 섹션 제목 (시안: 15px w700 + 초록 별표)
+/// Section heading (mockup: 15px w700 with a green asterisk)
 class SectionTitle extends StatelessWidget {
   final String text;
   final bool required;

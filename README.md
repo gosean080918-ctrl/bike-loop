@@ -1,200 +1,211 @@
 # BIKE LOOP
 
+**Report → review → optimized collection route → pickup → inventory → impact metrics.**
+A full pipeline for clearing abandoned bicycles, built for Korean local governments.
+
+> **LOOP means two things here**
+> ① the **circular route** a collection vehicle drives — depot → stops → depot — which this
+> project makes as short as possible, and ② the **loop of resources**: a bicycle headed for scrap
+> is repaired, donated and ridden again.
+
+---
+
 > **🇰🇷 Service area: South Korea only.**
-> BIKE LOOP is built for Korean local governments and runs **nationwide within South Korea**.
-> It does not work outside the country, and this is a deliberate design decision rather than
-> an unfinished feature.
+> BIKE LOOP runs **nationwide within South Korea** and does not work abroad. This is a deliberate
+> constraint, not an unfinished feature.
 >
-> **Why:** Korean law restricts the export of national map data, so Google Maps cannot provide
-> car navigation inside South Korea. Every geospatial feature here — map tiles, address lookup,
-> place search and road routing — therefore runs on **Kakao**, whose coverage ends at the border.
-> The app blocks out-of-country coordinates on purpose (`isInKorea()`), because Kakao returns
-> blank tiles there.
->
-> Supporting other countries would mean running a second provider (e.g. Google Maps) in parallel
-> and keeping both stacks alive, since Kakao remains mandatory for routing inside Korea.
-> That is out of scope for this project.
-
-> **🔑 About the API keys you can see in this repository.**
-> The keys visible in `app/lib/const/value/constants.dart` are **client-side keys that are meant
-> to be public** — a Kakao JavaScript key and a Supabase *publishable* (anon) key. They ship
-> inside every installed app, so hiding them in the source would achieve nothing. They are
-> protected by configuration instead: the Kakao key only works from registered domains, and
-> Supabase access is enforced by Row Level Security in the database, not by key secrecy.
->
-> **The keys that actually matter are not here and never were** — not in the working tree and
-> not in the commit history:
->
-> | Key | Where it lives | Risk if leaked |
-> |---|---|---|
-> | Kakao **REST** key | server `.env` only (git-ignored) | billed API quota abuse |
-> | Supabase `service_role` | not used at all | full database access |
->
-> The optimization server also refuses unauthenticated calls: it verifies the caller's Supabase
-> access token and rate-limits per user (`server/auth.py`), so knowing the server URL is not
-> enough to spend our Kakao quota. See `server/.env.example` for the variables you need to run
-> your own instance.
-
-방치된 자전거를 **신고 → 검토 → 최적 수거경로 생성 → 수거 → 재고관리 → 통계**까지
-한 흐름으로 처리하는 앱입니다. 전국(대한민국) 서비스.
-
-*(This README is written in Korean. The notice above summarises the service area in English.)*
-
-> **LOOP의 두 가지 뜻**
-> ① 차량이 보관소를 출발해 여러 지점을 돌고 돌아오는 **순환 경로**
-> ② 버려질 자전거가 수리·기부를 거쳐 다시 쓰이는 **자원의 순환**
+> **Why:** Korean law restricts the export of national map data, so Google Maps cannot provide car
+> navigation inside South Korea. Every geospatial feature here — map tiles, address lookup, place
+> search and road routing — therefore runs on **Kakao**, whose coverage ends at the border. The app
+> rejects out-of-country coordinates on purpose (`isInKorea()`), because Kakao returns blank tiles
+> there. Supporting other countries would mean running a second provider in parallel and keeping
+> both stacks alive, since Kakao remains mandatory for routing inside Korea.
 
 ---
 
-## 무엇을 해결하나
+## The problem
 
-| 기존 방식의 문제 | BIKE LOOP |
+Abandoned bicycles pile up around schools, apartment blocks and tourist car parks — especially
+after graduation and moving season. They occupy the racks people actually need, fall across
+footpaths, and are eventually scrapped even when a repair would have kept them on the road.
+
+Clearing them is harder than it sounds:
+
+| How it is done today | What goes wrong |
 |---|---|
-| 신고 위치가 "○○학교 근처"처럼 모호 | 지도 좌표 + 주소로 정확히 접수 |
-| 같은 자전거를 여러 명이 신고 | 30m 반경 자동 중복 확인 (PostGIS) |
-| 신고 순서대로 수거 → 같은 길 왕복 | OR-Tools로 최적 방문 순서 계산 |
-| 창고 재고가 장부 없이 방치 | 관리번호 자동 부여 + 상태 추적 |
-| 성과를 숫자로 못 보여줌 | 재생률·이동거리 대시보드 |
+| Phone calls and complaint boards | "Near the elementary school" is not a location; staff hunt for the bike |
+| Several people report the same bicycle | Nobody can tell one bike from three; crews are dispatched twice |
+| Collection in the order reports arrive | A poor visiting order adds tens of kilometres to a single day |
+| Bikes go into a warehouse | With no record of what is there or what is repairable, they are scrapped |
+| No measurement | Nobody can show the programme is working |
+
+**BIKE LOOP** addresses each: exact coordinates and addresses on intake, automatic duplicate
+detection, a solver that computes the visiting order, per-bicycle tracking with generated ID
+numbers, and a dashboard that reports how many bikes were brought back into use.
 
 ---
 
-## 구조
+## Architecture
 
 ```
-[Flutter 앱]  ──  [Supabase]              (데이터 · 사진 · 로그인 · 권한)
-      │           PostgreSQL + PostGIS
-      │           + Auth + Storage + RLS
+[Flutter app]  ──  [Supabase]                 data · photos · auth · permissions
+      │             PostgreSQL + PostGIS
+      │             + Auth + Storage + RLS
       │
-      ├────────  [FastAPI on Cloud Run]   (최적 경로 계산만 담당)
-      │           Python + Google OR-Tools
+      ├─────────  [FastAPI on Cloud Run]      route optimization only
+      │             Python + Google OR-Tools
       │
-      └────────  [카카오]                  (지도 · 주소 · 도로 경로)
+      └─────────  [Kakao]                     maps · geocoding · road routing
 ```
 
-**원칙: CRUD에는 서버를 두지 않는다.** 저장·조회는 앱이 Supabase와 직접 통신하고,
-권한은 RLS로 DB에서 강제합니다. 서버는 파이썬이 꼭 필요한 경로 최적화 하나만 담당합니다.
+**Design rule: no server for CRUD.** Reads and writes go straight from the app to Supabase, and
+authorization is enforced by Row Level Security inside the database rather than by an API layer.
+A server exists only for the one thing that genuinely needs Python — the optimizer. That keeps the
+backend to a handful of files and near-zero running cost (Cloud Run scales to zero when idle).
 
 ---
 
-## 폴더
+## Repository layout
 
 ```
-app/                Flutter 앱
-  lib/const/        모델 · 상수(regions.dart = 시도 17곳 보관소)
-  lib/service/      auth · report · admin · location · settings
-  lib/ui/route|tab/ 화면
-server/             FastAPI (/optimize · /address · /search)
-  engine.py         핫스팟 클러스터링 + 긴급도 + CVRP
-supabase/           스키마 · RLS · RPC · 마이그레이션 SQL (01~07 순서로 적용)
-analysis-server/    NYC 311 데이터로 방법론 검증한 PoC
-docs/               대회용 설명서(HTML)
-blueprint.txt       ★ 단일 진실 원천 — 기능 목록 · 설계 결정 · 작업 로그
+app/                    Flutter application
+  lib/const/            models and constants (regions.dart = 17 provincial depots)
+  lib/service/          auth · report · admin · location · settings · api client
+  lib/ui/route|tab/     screens
+server/                 FastAPI (/optimize · /address · /search)
+  engine.py             hotspot clustering + urgency tiers + CVRP
+  auth.py               Supabase token verification + per-user rate limiting
+supabase/               schema · RLS · RPC · migrations (apply 01 → 07 in order)
+analysis-server/        proof-of-concept validated on NYC 311 open data
+DEVLOG.md               engineering log — decisions, incidents, what broke and why
 ```
 
 ---
 
-## 핵심 로직
+## Core logic
 
-- **경로 최적화** — Google OR-Tools CVRP. 적재량·작업시간·출발/복귀·필수방문 지점을 제약으로 반영
-- **클러스터링** — 30m 내 자전거는 한 덩어리로 묶어 한 번만 정차
-- **긴급도** — 방치 기간에 따라 Critical(90일+) / High(60일+) / Medium(30일+) / Normal
-- **중복 탐색** — PostGIS `ST_DWithin`으로 실제 지상거리 30m 판정
-- **관리번호** — `{시도}_{시군구}_{YYYYMMDD}_{순번}` DB 트리거 자동 채번
-- **지역 검증** — 출발지와 수거 대상의 시도가 다르면 경로 생성 전 경고·정정
+**Route optimization.** Google OR-Tools solves a capacitated vehicle routing problem under real
+constraints: vehicle capacity, available working hours, depot and return point, and sites the
+administrator marked as mandatory. The combinatorics are the point — five stops have 120 possible
+orders, ten have 362,880, fifteen have 87 billion. Hand-planning loses distance every single day.
+
+**Clustering.** Bicycles within 30 m are treated as one stop, because a crew that parks once can
+load all of them.
+
+**Urgency tiers.** Priority rises with neglect: Critical (90+ days), High (60+), Medium (30+),
+Normal. This stops long-standing reports from being perpetually outranked by fresh ones.
+
+**Duplicate detection.** Before a report is saved, PostGIS `ST_DWithin` measures true ground
+distance to existing reports within 30 m — coordinate subtraction does not give metres on a sphere.
+
+**ID numbering.** `{province}_{district}_{YYYYMMDD}_{sequence}`, assigned by a database trigger so
+two staff registering simultaneously can never collide.
+
+**Region validation.** If the depot and the selected pickups are in different provinces, the app
+blocks route generation and offers to re-anchor the depot — a guard added after a real incident
+where a Jeju depot was paired with a Seoul pickup, producing a 69 km route.
 
 ---
 
-## 실행
+## Validation on real data
 
-### 1. 데이터베이스
-Supabase 프로젝트 생성 후 SQL Editor에서 `supabase/` 안의 파일을 **01 → 07 순서**로 실행합니다.
-(07은 일반 공개용 보안 강화 — 사진 열람 제한, 신고 도배 방지)
+There is no historical abandoned-bicycle dataset for Jeju, so the method was tested first against
+**New York City's 311 derelict bicycle reports — 2,930 records from 2020–2021**:
 
-### 2. 서버 (선택 — 이미 Cloud Run에 배포되어 있음)
+- **Hotspot analysis** (KDE + Getis-Ord Gi\*) confirmed that reports genuinely cluster; Port Morris
+  in the Bronx ranked highest (z = 4.04)
+- **CVRP** planned three trucks collecting 180 bicycles in 82.1 km total
+- **Seasonality** showed clear monthly peaks, consistent with the graduation-and-moving hypothesis
+
+Two lessons went directly into production code: split a site across visits when it exceeds vehicle
+capacity, and carry the remainder to the next run instead of failing. Details in
+`analysis-server/poc_nyc311/RESULTS.md`.
+
+---
+
+## Security model
+
+This repository is public. **Every key visible in the source is a client-side key that is meant to
+be public**, and the keys that would actually cost money are not here — not in the working tree and
+not in the commit history.
+
+| Key | Location | Why it is safe / what it risks |
+|---|---|---|
+| Supabase publishable (anon) | app source | Authorization is enforced by RLS in the database, not by secrecy |
+| Kakao **JavaScript** key | app source | Only works from registered domains |
+| Kakao **REST** key | server `.env` only (git-ignored) | Would allow billed quota abuse — never committed |
+| Supabase `service_role` | not used at all | Would grant full database access — designed out |
+
+**The optimization server rejects anonymous callers.** It verifies the caller's Supabase access
+token against Supabase itself, caches the result briefly, and rate-limits per user
+(`server/auth.py`). Knowing the server URL is not enough to spend our Kakao quota:
+
+```bash
+curl "https://<server>/search?q=jeju"
+# {"detail":"Login required (missing token)"}
+```
+
+Photos are readable only by their uploader and administrators, and a trigger blocks report flooding
+(more than 20 submissions in five minutes).
+
+---
+
+## Running it yourself
+
+Cloning this repository will not connect you to our Supabase project or server — permissions block
+that by design. To run your own instance:
+
+**1. Database**
+
+Create a Supabase project, then run the files in `supabase/` **in order, 01 → 07**, in the SQL
+editor. (07 is the public-launch hardening pass: photo access limits and flood protection.)
+
+**2. Server** (optional — a deployed instance already exists)
+
 ```bash
 cd server
 pip install -r requirements.txt
-cp .env.example .env      # 카카오 REST 키 입력
+cp .env.example .env      # fill in the Kakao REST key and Supabase URL/anon key
 uvicorn main:app --reload
 ```
 
-### 3. 앱
+**3. App**
+
 ```bash
 cd app
 flutter pub get
-flutter run                       # 개발
-flutter build apk --release       # 안드로이드 배포본
+flutter run                       # development
+flutter build apk --release       # Android release build
 ```
 
-`app/lib/const/value/constants.dart`에서 Supabase URL·키, 카카오 JS 키, 서버 주소를 설정합니다.
+Point `app/lib/const/value/constants.dart` at your own Supabase project, Kakao JavaScript key and
+server URL.
 
-> **관리자 지정**은 SQL로:
-> `update profiles set role='admin' where id='<uuid>';`
+Grant administrator rights with SQL:
 
----
-
-## 키 관리 원칙
-
-이 저장소는 공개되어 있습니다. **코드에 보이는 키는 모두 "공개돼도 되는 키"** 이며,
-실제로 위험한 키는 저장소에 없습니다(커밋 이력에도 없습니다).
-
-| 키 | 위치 | 왜 공개돼도 되나 |
-|---|---|---|
-| Supabase publishable(anon) | 앱 코드 | 권한은 RLS가 DB에서 강제. 이 키만으로는 남의 데이터를 못 읽음 |
-| 카카오 **JS** 키 | 앱 코드 | 등록된 플랫폼(패키지명·키해시)에서만 동작 |
-| 카카오 **REST** 키 | **서버 `.env`만** | 유출 시 과금 위험 — 저장소에 없음 |
-| Supabase `service_role` | **사용 안 함** | 필요 없도록 설계 |
-
-`.gitignore`가 `.env` 계열을 차단합니다. **`server/.env`를 강제로 커밋하지 마세요.**
-
-### 서버는 인증이 필요합니다
-
-최적화 서버(`/optimize` `/address` `/search`)는 **로그인한 앱 사용자만** 호출할 수 있습니다.
-앱이 보낸 Supabase 액세스 토큰을 서버가 검증하고(`server/auth.py`),
-사용자별로 분당 호출 횟수도 제한합니다. 토큰 없이 부르면 401이 돌아옵니다.
-
-```bash
-curl "https://<서버주소>/search?q=jeju"
-# {"detail":"로그인이 필요합니다 (missing token)"}
+```sql
+update profiles set role = 'admin' where id = '<uuid>';
 ```
 
-이 구조 덕분에 서버 주소가 공개되어도 카카오 API 할당량이 소모되지 않습니다.
+---
 
-### 직접 돌려보려면
+## Status
 
-이 저장소를 그대로 받아도 **제 Supabase/서버에는 붙지 않습니다**(권한이 막혀 있습니다).
-본인 환경에서 실행하려면 Supabase 프로젝트를 만들고 `supabase/01~07` SQL을 적용한 뒤,
-`app/lib/const/value/constants.dart`의 주소와 키를 본인 것으로 바꾸면 됩니다.
+All ten milestones of the MVP are implemented and verified on physical devices. Nationwide coverage
+shipped in August 2026; the public-launch security pass shipped in September 2026.
+
+**Next:** multi-vehicle routing · real road distances inside the optimizer (currently used for
+display only) · completion photos · a hotspot prediction model · per-municipality administrator
+accounts.
 
 ---
 
-## 검증
+## Credits
 
-앱을 만들기 전 **뉴욕시 311 방치 자전거 신고 2,930건**(2020–2021)으로 방법론을 먼저 검증했습니다.
+Built by **한정규 (Jeong-Kyu Han)**. Optimization engine adapted from a framework by
+**이강혁 (Kang-Hyuk Lee)**, used with permission.
 
-- 핫스팟 분석(KDE + Getis-Ord Gi*) — 브롱크스 Port Morris가 최상위 (z = 4.04)
-- CVRP — 트럭 3대로 180대 수거 시 총 82.1km
-- 월별 계절성 확인 (졸업·이사 시즌 가설과 일치)
+## License
 
-여기서 얻은 교훈(용량 초과 시 방문 분할, 미수거분 이월)을 운영 코드에 반영했습니다.
-자세한 내용은 `analysis-server/poc_nyc311/RESULTS.md`.
-
----
-
-## 현재 상태
-
-MVP 10단계 전부 구현·실기기 검증 완료. 전국 확장 적용(2026-08).
-
-**다음 단계** — 다중 차량 지원 · 실제 도로거리 기반 계산 · 완료 사진 ·
-핫스팟 예측 모델 · 지자체별 관리자 계정 분리
-
----
-
-## 만든 사람
-
-한정규 · 최적화 로직 자문 이강혁
-
-## 라이선스
-
-MIT — 자세한 내용은 [LICENSE](LICENSE) 참고.
-브랜드 요소(BIKE LOOP 이름·로고)와 운영 데이터는 라이선스 대상이 아닙니다.
+MIT — see [LICENSE](LICENSE). Brand assets (the BIKE LOOP name and logo) and operational data are
+not covered by the licence.

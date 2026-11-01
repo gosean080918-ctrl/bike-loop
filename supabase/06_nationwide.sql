@@ -1,19 +1,19 @@
 -- ============================================================
--- BIKE LOOP — 전국 확장 (2026-08-12)
--- 적용: Supabase 대시보드 > SQL Editor 에 전체 붙여넣고 Run
--- 선행: 01 ~ 05 적용 완료 상태
+-- BIKE LOOP — nationwide expansion (2026-08-12)
+-- Apply: paste the whole file into Supabase > SQL Editor and run it
+-- Requires: 01 through 05 already applied
 -- ============================================================
--- 무엇이 바뀌나
---  1) reports에 region_1(시도) / region_2(시군구) 컬럼 추가 + 자동 채움
---  2) 관리번호를 {시도}_{시군구}_{날짜}_{순번} 으로 확장
---     (전국이 되면 '남구'처럼 여러 시도에 같은 이름이 존재하기 때문)
---  3) 기존 데이터 소급 적용
+-- What this changes
+--  1) Adds region_1 (province) / region_2 (city or district) to reports, filled automatically
+--  2) Extends the ID number to {province}_{district}_{date}_{sequence}
+--     (nationwide, district names such as Nam-gu exist in several provinces at once)
+--  3) Backfills existing rows
 -- ============================================================
 
 -- ------------------------------------------------------------
--- 0) 시도 표기 정규화 함수
---    카카오는 '서울특별시'로 줄 때도, '서울'로 줄 때도 있다.
---    강원/전북은 특별자치도로 바뀌어 옛 표기도 함께 받아준다.
+-- 0) Normalize how a province is written
+--    Kakao sometimes returns the full name and sometimes the short one.
+--    Gangwon and Jeonbuk were renamed, so the old spellings are accepted too.
 -- ------------------------------------------------------------
 create or replace function public.norm_region1(p_addr text)
 returns text
@@ -48,7 +48,7 @@ begin
 end;
 $$;
 
--- 시도 → 짧은 이름 (관리번호에 사용: '경기도' → '경기')
+-- Province -> short name, used inside the ID number (Gyeonggi-do -> Gyeonggi)
 create or replace function public.short_region1(p_region text)
 returns text
 language sql immutable
@@ -76,15 +76,15 @@ as $$
 $$;
 
 -- ------------------------------------------------------------
--- 1) reports에 지역 컬럼 추가
+-- 1) Add the region columns to reports
 -- ------------------------------------------------------------
 alter table public.reports
-  add column if not exists region_1 text,   -- 시도  (예: 경기도)
-  add column if not exists region_2 text;   -- 시군구 (예: 수원시)
+  add column if not exists region_1 text,   -- province (e.g. Gyeonggi-do)
+  add column if not exists region_2 text;   -- city or district (e.g. Suwon-si)
 
 create index if not exists reports_region_1_idx on public.reports (region_1);
 
--- 주소가 들어오거나 바뀔 때 지역을 자동으로 채운다
+-- Fill the region whenever an address is inserted or changed
 create or replace function public.fill_report_region()
 returns trigger
 language plpgsql
@@ -101,15 +101,15 @@ create trigger reports_fill_region
   before insert or update of address on public.reports
   for each row execute function public.fill_report_region();
 
--- 기존 데이터 소급
+-- Backfill existing rows
 update public.reports
    set region_1 = public.norm_region1(address),
        region_2 = nullif(split_part(coalesce(address, ''), ' ', 2), '')
  where address is not null;
 
 -- ------------------------------------------------------------
--- 2) 관리번호: {시도}_{시군구}_{YYYYMMDD}_{NNN}
---    예) 경기_수원시_20260812_001
+-- 2) ID number: {province}_{district}_{YYYYMMDD}_{NNN}
+--    e.g. Gyeonggi_Suwon-si_20260812_001
 -- ------------------------------------------------------------
 create or replace function public.gen_bike_code()
 returns trigger
@@ -145,12 +145,12 @@ begin
 end;
 $$;
 
--- 트리거는 04에서 이미 걸려 있으므로 함수 교체만으로 적용됨
+-- The trigger was already created in 04, so replacing the function is enough
 -- (bikes_gen_code / before insert on public.bikes)
 
 -- ------------------------------------------------------------
--- 3) 기존 재고 관리번호 소급 재부여
---    ※ 이미 인쇄·부착한 번호가 있다면 이 블록은 건너뛰세요.
+-- 3) Re-issue ID numbers for inventory created earlier
+--    NOTE: skip this block if labels with the old numbers are already printed and attached.
 -- ------------------------------------------------------------
 do $$
 declare
@@ -162,7 +162,7 @@ declare
   v_prefix text;
   v_seq    int;
 begin
-  -- 새 형식(시도_시군구_날짜_순번)이 아닌 행만 대상
+  -- Only rows that are not already in the new format
   for r in
     select b.id, b.report_id, b.collected_at
       from public.bikes b
@@ -191,7 +191,7 @@ end;
 $$;
 
 -- ------------------------------------------------------------
--- 4) 확인용
+-- 4) Verification
 -- ------------------------------------------------------------
 -- select region_1, region_2, count(*) from public.reports group by 1,2 order by 1,2;
 -- select code, collected_at from public.bikes order by collected_at desc limit 20;

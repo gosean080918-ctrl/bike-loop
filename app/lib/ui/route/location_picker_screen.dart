@@ -7,8 +7,8 @@ import '../../const/value/app_theme.dart';
 import '../../const/value/constants.dart';
 import '../../service/api_client.dart';
 
-/// RPT-02: 지도에서 신고 위치 조정 + 장소 검색 (예: "강남역")
-/// 지도를 움직여 중앙 핀을 맞추거나, 검색으로 바로 이동 후 확정.
+/// RPT-02: adjust the report location on the map, with place search
+/// Pan the map under the centre pin, or search to jump straight to a place, then confirm.
 class LocationPickerScreen extends StatefulWidget {
   final double initialLat;
   final double initialLng;
@@ -37,8 +37,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   List<_Place> _results = [];
   bool _searching = false;
 
-  // 카카오맵은 한국 밖 타일이 없음 → 해외 좌표(에뮬레이터 기본 GPS 등)는
-  // 흰 화면이 되므로 기본 위치(전국 중심)로 대체
+  // Kakao Maps has no tiles outside Korea, so foreign coordinates (such as an emulator's
+  // default GPS) render blank; fall back to the national centre instead
   late double _centerLat = isInKorea(widget.initialLat, widget.initialLng)
       ? widget.initialLat
       : kDefaultLat;
@@ -46,7 +46,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       ? widget.initialLng
       : kDefaultLng;
 
-  /// 신고자 위치가 있으면 동네 수준으로, 없으면 전국 뷰로 시작
+  /// Start at neighbourhood zoom when the reporter's position is known, nationwide otherwise
   late final int _initialLevel =
       isInKorea(widget.initialLat, widget.initialLng)
           ? kNearMapLevel
@@ -87,7 +87,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   }
 
   void _moveTo(_Place p) {
-    // 서비스 지역(대한민국) 밖이면 이동 자체를 막음
+    // Block the move entirely if it leaves the service area
     if (!isInKorea(p.lat, p.lng)) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(kOutOfServiceMsg)));
@@ -100,7 +100,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _results = [];
       _query.text = p.name;
     });
-    // 지도 재생성 없이 컨트롤러로 직접 이동
+    // Move via the controller rather than rebuilding the map
     _controller?.setCenter(LatLng(p.lat, p.lng));
     _controller?.setLevel(3);
   }
@@ -112,7 +112,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     }
     center ??= LatLng(_centerLat, _centerLng);
     if (!mounted) return;
-    // 서비스 지역(대한민국) 밖 확정 불가
+    // Cannot confirm a point outside the service area
     if (!isInKorea(center.latitude, center.longitude)) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(kOutOfServiceMsg)));
@@ -127,14 +127,14 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       appBar: AppBar(title: const Text('Adjust location')),
       body: Stack(
         children: [
-          // 지도를 화면 전체에 강제 배치 (크기 미지정으로 인한 빈 화면 방지)
+          // Force the map to fill the screen; an unsized box renders blank
           Positioned.fill(
             child: KakaoMap(
               center: LatLng(_centerLat, _centerLng),
               currentLevel: _initialLevel,
               onMapCreated: (c) {
                 _controller = c;
-                // 생성 직후 레이아웃/중심 재적용 (빈 화면 보정)
+                // Re-apply layout and centre right after creation, to fix a blank map
                 Future.delayed(const Duration(milliseconds: 600), () {
                   _controller?.relayout();
                   _controller?.setCenter(
@@ -143,7 +143,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
               },
             ),
           ),
-          // 화면 중앙 고정 핀
+          // Pin fixed at the centre of the screen
           const Positioned.fill(
             child: IgnorePointer(
               child: Center(
@@ -155,7 +155,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
               ),
             ),
           ),
-          // 상단 검색바 + 결과 리스트
+          // Search bar and result list at the top
           Positioned(
             top: 12,
             left: 16,

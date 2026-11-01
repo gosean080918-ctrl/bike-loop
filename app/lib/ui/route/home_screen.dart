@@ -11,9 +11,9 @@ import '../tab/map_tab.dart';
 import '../tab/my_reports_tab.dart';
 import '../tab/report_tab.dart';
 
-/// AUTH-03: 역할에 따라 탭 구성 분기
-/// 일반: 지도 / 신고 / 내 신고
-/// 관리자: 지도 / 검토 / 작업 (+ 신고도 가능하도록 유지)
+/// AUTH-03: the tab set depends on the user's role
+/// User:  Map / Report / My reports
+/// Admin: Map / Review / Jobs (admins can still file reports)
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -71,7 +71,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ],
       ),
       body: IndexedStack(index: _index, children: tabs),
-      // 관리자도 직접 신고할 수 있게 — 지도 탭에서만 표시
+      // Admins can file reports too; shown on the map tab only
       floatingActionButton: (isAdmin && _index == 0)
           ? FloatingActionButton.extended(
               backgroundColor: AppColors.primary,

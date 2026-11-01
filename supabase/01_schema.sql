@@ -1,13 +1,13 @@
 -- ============================================================
--- BikeReclaim — 스키마 (BE-01)
--- 적용: Supabase 대시보드 > SQL Editor 에서 01 → 02 → 03 순서로 실행
+-- BIKE LOOP — database schema
+-- Apply in the Supabase dashboard SQL editor, in order: 01 -> 02 -> 03
 -- ============================================================
 
--- PostGIS 활성화 (Supabase는 extensions 스키마 권장)
+-- Enable PostGIS (Supabase recommends the extensions schema)
 create extension if not exists postgis with schema extensions;
 
 -- ------------------------------------------------------------
--- profiles: auth.users 1:1 (역할 관리)
+-- profiles: 1:1 with auth.users, holds the role
 -- ------------------------------------------------------------
 create table if not exists public.profiles (
   id           uuid primary key references auth.users(id) on delete cascade,
@@ -16,7 +16,7 @@ create table if not exists public.profiles (
   created_at   timestamptz not null default now()
 );
 
--- 회원가입 시 프로필 자동 생성
+-- Create a profile automatically on sign-up
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql security definer set search_path = public
@@ -34,8 +34,8 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- ------------------------------------------------------------
--- reports: 방치 자전거 신고
--- 상태 흐름: submitted → approved | rejected | duplicate
+-- reports: abandoned bicycle reports
+-- Status flow: submitted -> approved | rejected | duplicate
 --            approved → scheduled → collected
 -- ------------------------------------------------------------
 create table if not exists public.reports (
@@ -49,7 +49,7 @@ create table if not exists public.reports (
   address      text,
   condition    text not null check (condition in
                ('long_term','damaged','obstruction','parts_missing','other')),
-               -- 장기방치의심 / 파손 / 통행방해 / 부품분실 / 기타
+               -- long_term / damaged / obstruction / parts_missing / other
   description  text not null default '',
   status       text not null default 'submitted' check (status in
                ('submitted','approved','rejected','duplicate','scheduled','collected')),
@@ -58,7 +58,7 @@ create table if not exists public.reports (
   reported_at  timestamptz not null default now(),
   reviewed_at  timestamptz,
   collected_at timestamptz,
-  job_id       uuid  -- collection_jobs 생성 후 FK 추가 (아래 참조)
+  job_id       uuid  -- FK added after collection_jobs exists (see below)
 );
 
 create index if not exists reports_geom_idx   on public.reports using gist (geom);
@@ -66,7 +66,7 @@ create index if not exists reports_status_idx on public.reports (status);
 create index if not exists reports_reporter_idx on public.reports (reporter_id);
 
 -- ------------------------------------------------------------
--- collection_jobs: 수거 작업 (관리자가 생성, /optimize 결과 저장)
+-- collection_jobs: a collection run created by an admin, storing the /optimize result
 -- ------------------------------------------------------------
 create table if not exists public.collection_jobs (
   id               uuid primary key default gen_random_uuid(),
@@ -75,7 +75,7 @@ create table if not exists public.collection_jobs (
   work_minutes     int not null default 240,
   depot_lat        double precision not null,
   depot_lng        double precision not null,
-  return_lat       double precision,   -- null이면 출발지 복귀
+  return_lat       double precision,   -- null means return to the depot
   return_lng       double precision,
   status           text not null default 'planned'
                    check (status in ('planned','in_progress','done')),
@@ -91,7 +91,7 @@ alter table public.reports
   foreign key (job_id) references public.collection_jobs(id) on delete set null;
 
 -- ------------------------------------------------------------
--- job_stops: 작업별 방문 순서 (OR-Tools 결과)
+-- job_stops: visiting order for a job (the OR-Tools solution)
 -- ------------------------------------------------------------
 create table if not exists public.job_stops (
   job_id         uuid not null references public.collection_jobs(id) on delete cascade,
@@ -104,7 +104,7 @@ create table if not exists public.job_stops (
 );
 
 -- ------------------------------------------------------------
--- bikes: 수거된 자전거 재고 (보관/수리/기부/재사용/폐기)
+-- bikes: inventory of collected bicycles (stored / repair / donated / reused / disposed)
 -- ------------------------------------------------------------
 create table if not exists public.bikes (
   id               uuid primary key default gen_random_uuid(),

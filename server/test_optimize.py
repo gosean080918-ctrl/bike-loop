@@ -1,4 +1,4 @@
-"""로컬 검증 v2 — 이강혁 엔진 + FastAPI TestClient (제주 가상 시나리오)"""
+"""Local verification: engine v2 behind the FastAPI TestClient, Jeju scenarios."""
 from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
@@ -14,9 +14,9 @@ def iso(days_ago: int) -> str:
 
 
 def make_stops():
-    """클러스터 2개 + 고립 3대. 경과일로 urgency 분산."""
+    """Two clusters plus three isolated bikes, spread across urgency tiers."""
     stops = []
-    # Cluster A (구억리 인근, 30m 내 3대) — 오래된 신고
+    # Cluster A: 3 bikes within 30 m, long-standing reports
     base = (33.2900, 126.2650)
     for i, d in enumerate([95, 70, 40]):
         stops.append({
@@ -25,7 +25,7 @@ def make_stops():
             "lng": base[1] + i * 0.0001,
             "reported_at": iso(d),
         })
-    # Cluster B (저지리 인근, 2대) — 최근 신고
+    # Cluster B: 2 bikes, recent reports
     for i, d in enumerate([5, 10]):
         stops.append({
             "report_id": f"B{i}",
@@ -33,7 +33,7 @@ def make_stops():
             "lng": 126.2510 + i * 0.0001,
             "reported_at": iso(d),
         })
-    # 고립 3대
+    # Three isolated bikes
     for i, (lat, lng, d) in enumerate([
         (33.3060, 126.2860, 65),
         (33.2750, 126.3050, 20),
@@ -48,7 +48,7 @@ def make_stops():
     return stops
 
 
-DEPOT = {"lat": 33.2870, "lng": 126.2630}  # 글로벌에듀시티 인근
+DEPOT = {"lat": 33.2870, "lng": 126.2630}  # depot used in the test scenarios
 
 
 def test_health():
@@ -56,7 +56,7 @@ def test_health():
 
 
 def test_cost_benefit():
-    """엔진 철학: 오래된(긴급) 신고는 수거, 최근+먼 신고는 자동 이월"""
+    """Engine policy: urgent old reports are collected; recent distant ones roll over."""
     r = client.post("/optimize", json={
         "depot": DEPOT,
         "vehicle_capacity": 20,
@@ -66,10 +66,10 @@ def test_cost_benefit():
     assert r.status_code == 200, r.text
     b = r.json()
     picked = {s["report_id"] for s in b["routes"][0]["stops"]}
-    # 90일/70일 경과(Critical/High)는 반드시 수거
+    # 90 and 70 days old (Critical / High) must be collected
     assert {"A0", "A1"} <= picked, picked
-    # 이월된 것들은 전부 30일 미만(Normal)이어야 함
-    recent = {"B0", "B1", "X2"}  # 5/10/3일 경과
+    # Everything rolled over must be under 30 days old (Normal)
+    recent = {"B0", "B1", "X2"}  # 5, 10 and 3 days old
     assert set(b["dropped_report_ids"]) <= recent, b["dropped_report_ids"]
     seqs = [s["seq"] for s in b["routes"][0]["stops"]]
     assert seqs == sorted(seqs)
@@ -79,7 +79,7 @@ def test_cost_benefit():
 
 
 def test_capacity_priority():
-    """용량 4대 → 오래된 신고(urgency 높은) 위주 선택 + 이월"""
+    """Capacity of 4: the solver favours high-urgency reports and rolls over the rest."""
     r = client.post("/optimize", json={
         "depot": DEPOT,
         "vehicle_capacity": 4,
@@ -91,14 +91,14 @@ def test_capacity_priority():
     assert b["collected"] <= 4
     assert len(b["dropped_report_ids"]) >= 4
     picked = {s["report_id"] for s in b["routes"][0]["stops"]}
-    # 가장 오래된 A0(95일)는 반드시 포함되어야 함
+    # A0, the oldest at 95 days, must be included
     assert "A0" in picked, picked
     print("capacity ok: picked", sorted(picked),
           "dropped", b["dropped_report_ids"])
 
 
 def test_worktime_limit():
-    """작업시간 25분 제한 → 일부만 수거하고 시간 내 복귀"""
+    """A 25-minute budget: collect a subset and still return in time."""
     r = client.post("/optimize", json={
         "depot": DEPOT,
         "vehicle_capacity": 20,
@@ -114,7 +114,7 @@ def test_worktime_limit():
 
 
 def test_return_to_differs():
-    """복귀지가 출발지와 다를 때도 정상 작동"""
+    """Works when the return point differs from the depot."""
     r = client.post("/optimize", json={
         "depot": DEPOT,
         "return_to": {"lat": 33.3100, "lng": 126.2900},
@@ -125,7 +125,7 @@ def test_return_to_differs():
     assert r.status_code == 200, r.text
     b = r.json()
     picked = {s["report_id"] for s in b["routes"][0]["stops"]}
-    assert {"A0", "A1", "A2"} <= picked  # 오래된 클러스터는 반드시 수거
+    assert {"A0", "A1", "A2"} <= picked  # the old cluster must be collected
     print("return ok:", b["collected"], "collected,",
           b["total_distance_m"], "m")
 

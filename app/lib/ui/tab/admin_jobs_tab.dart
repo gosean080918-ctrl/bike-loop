@@ -12,7 +12,8 @@ import '../../state_management/providers.dart';
 import '../route/depot_picker_screen.dart';
 import '../route/route_map_screen.dart';
 
-/// ADM-03~07: 수거 대상 선택 → 경로 생성 → 방문 순서 → 길안내 → 완료 처리
+/// ADM-03 to 07: pick the stops, generate a route, review the visit order, start
+/// navigation, then mark each stop complete
 class AdminJobsTab extends ConsumerStatefulWidget {
   const AdminJobsTab({super.key});
 
@@ -26,24 +27,24 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
   final _workMin = TextEditingController(text: '240');
   bool _busy = false;
 
-  /// 전국 확장(2026-08-12): 담당 지역 필터. null이면 전체.
-  /// ⚠ 지역이 섞인 채로 경로를 만들면 제주 신고와 경기 신고가 한 경로에
-  ///   들어가 버리므로, 지역을 고르면 목록과 선택을 그 지역으로 한정한다.
+  /// Nationwide expansion (2026-08-12): the region filter; null means all regions.
+  /// NOTE: without this, reports from different provinces can end up in a single route,
+  ///   so choosing a region restricts both the list and the selection to it.
   String? _region;
 
-  /// 선택 지역의 기본 보관소(도청/시청)를 출발·복귀지로 설정
+  /// Set the region's default depot (its provincial or city office) as start and return point
   Future<void> _useRegionDepot() async {
     final rd = depotOf(_region);
     if (rd == null) return;
     setState(() => _busy = true);
     try {
-      // 정확한 좌표는 서버 검색으로 얻고, 실패하면 내장 좌표로 폴백
+      // Resolve exact coordinates by server search, falling back to the built-in values
       final settings = ref.read(settingsServiceProvider);
       final resolved = await settings.resolveAddress(rd.depotAddress);
       final lat = resolved?.$1 ?? rd.lat;
       final lng = resolved?.$2 ?? rd.lng;
       await settings.saveDepot(lat, lng, rd.depotAddress);
-      await settings.clearReturn(); // 복귀지는 출발지와 동일로 초기화
+      await settings.clearReturn(); // reset the return point to match the start point
       ref.invalidate(depotProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -54,15 +55,15 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
     }
   }
 
-  /// 지역 필터 적용
+  /// Apply the region filter
   List<Report> _filtered(List<Report> list) {
     if (_region == null) return list;
     return list.where((r) => regionOf(r.address) == _region).toList();
   }
 
-  /// ★ 경로 생성 전 지역 검증 (전국 확장 후 필수)
-  /// 제주 보관소에서 출발해 서울 자전거를 주우러 가는 동선이 만들어지는 것을 막는다.
-  /// 통과하면 true, 사용자가 취소하면 false.
+  /// Region check before generating a route — required once coverage went nationwide.
+  /// Prevents routes that start at a Jeju depot and drive to a pickup in Seoul.
+  /// Returns true to proceed, false if the user cancels.
   Future<bool> _checkRegions(List<Report> targets) async {
     final depot = await ref.read(depotProvider.future);
     if (!mounted) return false;
@@ -70,7 +71,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
     final targetRegions =
         targets.map((r) => regionOf(r.address)).whereType<String>().toSet();
 
-    // ① 선택한 신고가 여러 지역에 걸쳐 있는 경우
+    // (a) The selected reports span more than one region
     if (targetRegions.length > 1) {
       final ok = await showDialog<bool>(
             context: context,
@@ -95,7 +96,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
       if (!ok) return false;
     }
 
-    // ② 출발지가 대상 지역과 다른 경우 → 해당 지역 청사로 바꿔줄지 물어본다
+    // (b) The depot is in a different region: offer to move it to that region's office
     if (targetRegions.length == 1) {
       final target = targetRegions.first;
       if (depotRegion != null && depotRegion != target) {
@@ -143,7 +144,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
     final regionOk = await _checkRegions(targets);
     if (!regionOk || !mounted) return;
     setState(() => _busy = true);
-    // 계산 중에는 화면을 막고 진행 상태를 보여준다(중복 입력 방지)
+    // Block the screen while solving and show progress, to prevent double submission
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -210,7 +211,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
       }
     } finally {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop(); // 로딩 닫기
+        Navigator.of(context, rootNavigator: true).pop(); // dismiss the loading dialog
         setState(() => _busy = false);
       }
     }
@@ -251,7 +252,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
     }
   }
 
-  /// 수거 작업 삭제 (이력 정리용)
+  /// Delete a collection job, for tidying up history
   Future<void> _deleteJob(String jobId, int stopCount) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -288,8 +289,8 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
     }
   }
 
-  /// 출발지/복귀지 변경 — 전국 17개 청사 목록 화면에서 선택
-  /// (목록에서 '지도에서 직접 선택'으로 차고지 지정도 가능)
+  /// Change the start or return point, chosen from the list of 17 regional offices
+  /// (the list also offers "pick on the map" for a depot of one's own)
   Future<void> _changeDepot({required bool isReturn}) async {
     final depot = await ref.read(depotProvider.future);
     if (!mounted) return;
@@ -414,7 +415,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
     );
   }
 
-  /// ADM-05: KakaoMap 외부 앱(미설치 시 웹) 길안내
+  /// ADM-05: hand off to the Kakao Map app for navigation, or the web version if absent
   Future<void> _navigateTo(double lat, double lng) async {
     final appUrl = Uri.parse('kakaomap://route?ep=$lat,$lng&by=CAR');
     final webUrl =
@@ -439,7 +440,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          // ---------- 담당 지역 (전국 확장) ----------
+          // ---------- Region in charge (nationwide expansion) ----------
           Text('Region', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Container(
@@ -476,7 +477,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                       ],
                       onChanged: (v) => setState(() {
                         _region = v;
-                        _selected.clear(); // 지역이 바뀌면 선택 초기화(혼선 방지)
+                        _selected.clear(); // clear the selection when the region changes
                       }),
                     ),
                   ),
@@ -499,7 +500,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
             ),
           const SizedBox(height: 20),
 
-          // ---------- 출발지/복귀지 (보관소) ----------
+          // ---------- Start and return point (depot) ----------
           Text('Depot & return point',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -518,7 +519,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
               ),
           const SizedBox(height: 20),
 
-          // ---------- 수거 대상 선택 (ADM-03) ----------
+          // ---------- Choosing the stops (ADM-03) ----------
           Text(
               _region == null
                   ? 'Select targets (approved)'
@@ -599,7 +600,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
           ),
           const Divider(height: 32),
 
-          // ---------- 작업 목록 (ADM-04~07) ----------
+          // ---------- Job list (ADM-04 to 07) ----------
           Text('Collection jobs', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           jobs.when(

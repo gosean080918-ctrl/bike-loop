@@ -1,8 +1,8 @@
 import 'package:geolocator/geolocator.dart';
 
-/// RPT-02 위치 권한 + 현재 위치
+/// RPT-02: location permission and current position
 class LocationService {
-  /// 권한 확인/요청 후 현재 위치 반환. 실패 시 null.
+  /// Checks or requests permission, then returns the current position; null on failure.
   Future<Position?> getCurrentPosition() async {
     if (!await Geolocator.isLocationServiceEnabled()) return null;
 
@@ -15,7 +15,7 @@ class LocationService {
       return null;
     }
 
-    // GPS 수신이 느린 실내 등에서 앱이 멈춘 것처럼 보이지 않도록 시간 제한
+    // Time-limited so the app does not look frozen indoors, where a GPS fix is slow
     try {
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
@@ -24,13 +24,13 @@ class LocationService {
         ),
       );
     } catch (_) {
-      // 시간 초과 시 마지막으로 알던 위치라도 반환
+      // On timeout, fall back to the last known position
       return Geolocator.getLastKnownPosition();
     }
   }
 
-  /// 캐시된 마지막 위치 (즉시 반환, 정확도는 낮을 수 있음).
-  /// 지도를 먼저 대략 옮겨 체감 속도를 높이는 용도.
+  /// The cached last position: returns immediately, but may be less accurate.
+  /// Used to move the map roughly into place first, so the app feels faster.
   Future<Position?> getLastKnownPosition() async {
     try {
       if (!await Geolocator.isLocationServiceEnabled()) return null;

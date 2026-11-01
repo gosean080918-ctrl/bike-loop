@@ -1,20 +1,21 @@
-/// 한글 주소·관리번호를 화면 표시용 로마자로 바꾼다 (영어 시연판 전용).
+/// Transliterates Korean addresses and ID numbers into Roman letters, for display only.
 ///
-/// [왜 필요한가]
-/// 주소는 카카오 API가, 관리번호는 DB 트리거가 만들어 준다. 둘 다 한글이라
-/// 앱 문구만 영어로 바꿔서는 화면에 한글이 남는다. 그렇다고 DB나 외부 API를
-/// 건드릴 수는 없으니, **보여줄 때만** 로마자로 변환한다.
+/// [Why this exists]
+/// Addresses come from the Kakao API and ID numbers from a database trigger. Both are in
+/// Korean, so translating the app's own labels still leaves Korean on screen. Changing the
+/// database or the external API is not an option, so the conversion happens **at display
+/// time only**.
 ///
-/// [범위]
-/// 완전한 로마자 변환기가 아니다. 시연에 나오는 제주 지역과 전국 시도 이름,
-/// 그리고 행정구역 접미사(시/군/구/읍/면/동/리/로/길)만 처리한다.
-/// 매핑에 없는 글자는 그대로 둔다 — 틀린 로마자를 지어내는 것보다 낫다.
+/// [Scope]
+/// This is not a complete romanizer. It covers the 17 regional names, Jeju's districts, and
+/// the administrative suffixes (-si, -gun, -gu, -eup, -myeon, -dong, -ri, -ro, -gil).
+/// Anything not in the table is left as it is, which beats inventing a wrong spelling.
 library;
 
-/// 긴 이름부터 치환해야 한다.
-/// (예: '서귀포시'를 '서귀포'+'시'로 쪼개기 전에 통째로 잡는다)
+/// Longer names must be replaced first
+/// (so a full city name is matched whole, before its suffix is split off)
 const Map<String, String> _places = {
-  // ---- 시도 17곳 ----
+  // ---- The 17 regions ----
   '제주특별자치도': 'Jeju',
   '서울특별시': 'Seoul',
   '부산광역시': 'Busan',
@@ -33,11 +34,11 @@ const Map<String, String> _places = {
   '경상북도': 'Gyeongbuk',
   '경상남도': 'Gyeongnam',
 
-  // ---- 제주 시군구 ----
+  // ---- Jeju's cities ----
   '서귀포시': 'Seogwipo-si',
   '제주시': 'Jeju-si',
 
-  // ---- 제주 읍면동 (시연에 나오는 곳 위주) ----
+  // ---- Jeju's towns, townships and neighbourhoods ----
   '대정읍': 'Daejeong-eup',
   '한림읍': 'Hallim-eup',
   '애월읍': 'Aewol-eup',
@@ -69,7 +70,7 @@ const Map<String, String> _places = {
   '아라동': 'Ara-dong',
   '오라동': 'Ora-dong',
 
-  // ---- 시연에 쓰는 도로·시설명 ----
+  // ---- Roads and facilities ----
   '글로벌에듀로': 'Global Edu-ro',
   '제주특별자치도청': 'Jeju Provincial Office',
   '제주국제공항': 'Jeju International Airport',
@@ -78,7 +79,7 @@ const Map<String, String> _places = {
   '문연로': 'Munyeon-ro',
 };
 
-/// 접미사만 남은 경우를 위한 보조 치환 (위 표에서 못 잡은 것들)
+/// Secondary pass for suffixes the table above did not catch
 const Map<String, String> _suffixes = {
   '특별자치도': '',
   '광역시': '',
@@ -94,38 +95,38 @@ const Map<String, String> _suffixes = {
   '길': '-gil',
 };
 
-/// 한글이 포함되어 있는지
+/// Whether the string still contains Hangul
 bool hasHangul(String s) => RegExp(r'[가-힣]').hasMatch(s);
 
-/// 주소 문자열을 로마자로. 매핑에 없는 한글은 그대로 남는다.
+/// Romanizes an address. Hangul that is not in the table is left untouched.
 ///
-/// 예) '제주특별자치도 서귀포시 대정읍 동일리 2855-2'
-///   → 'Jeju Seogwipo-si Daejeong-eup Dongil-ri 2855-2'
+/// e.g. a Jeju address becomes
+///   'Jeju Seogwipo-si Daejeong-eup Dongil-ri 2855-2'
 String romanizeAddress(String? address) {
   if (address == null || address.isEmpty) return '';
   var out = address;
 
-  // 긴 이름 먼저 (키 길이 내림차순)
+  // Longest keys first
   final keys = _places.keys.toList()
     ..sort((a, b) => b.length.compareTo(a.length));
   for (final k in keys) {
     out = out.replaceAll(k, _places[k]!);
   }
 
-  // 남은 접미사 정리 — '○○시'처럼 앞말을 못 바꾼 경우는 건드리지 않는다
-  // (한글이 통째로 남아 있으면 로마자와 섞여 더 어색해지므로)
+  // Tidy up remaining suffixes, but skip the case where the stem could not be converted
+  // (leaving whole Hangul words mixed in with Roman letters reads worse)
   if (!hasHangul(out)) {
     for (final e in _suffixes.entries) {
       out = out.replaceAll(e.key, e.value);
     }
   }
 
-  // 공백 정리
+  // Collapse whitespace
   return out.replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
-/// 관리번호를 로마자로.
-/// 예) '제주_서귀포시_20260812_001' → 'Jeju_Seogwipo-si_20260812_001'
+/// Romanizes an ID number.
+/// e.g. a Jeju code becomes 'Jeju_Seogwipo-si_20260812_001'
 String romanizeCode(String? code) {
   if (code == null || code.isEmpty) return '';
   return code
@@ -134,8 +135,8 @@ String romanizeCode(String? code) {
       .join('_');
 }
 
-/// 시도 표준명 → 영문 (지역 드롭다운용)
-/// 예) '제주특별자치도' → 'Jeju'
+/// Canonical region name -> English, for the region dropdown
+/// e.g. the full name of Jeju province becomes 'Jeju'
 String romanizeRegion(String? region) {
   if (region == null || region.isEmpty) return '';
   return _places[region] ?? romanizeAddress(region);

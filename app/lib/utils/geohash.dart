@@ -1,5 +1,5 @@
-/// 순수 Dart geohash 인코더 (외부 의존성 없음).
-/// Firestore 지리 쿼리(prefix 검색)와 서버 집계에 사용. precision 9 ≈ 4.8m.
+/// Pure-Dart geohash encoder, no external dependencies.
+/// Used for prefix-based geo queries and server-side aggregation. Precision 9 is about 4.8 m.
 library;
 
 const _base32 = '0123456789bcdefghjkmnpqrstuvwxyz';

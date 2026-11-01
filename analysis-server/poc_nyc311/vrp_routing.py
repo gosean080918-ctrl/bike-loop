@@ -1,9 +1,9 @@
 """
-PoC 2 — 수거 동선 최적화 (CVRP, OR-Tools)
-입력: hotspots_top.csv (Gi* 상위 셀) → 상위 40개 지점을 수거 스톱으로
-설정: 차량 3대, 용량 60대/차량, 수요 = 셀 신고건수(추정 방치대수 프록시)
-거리: 하버사인(도로거리 근사). 실서비스에선 카카오모빌리티 거리행렬로 대체.
-출력: routes.csv, vrp_routes.png
+PoC 2 — collection route optimization (CVRP, OR-Tools)
+Input: hotspots_top.csv (the top Gi* cells); the top 40 become collection stops
+Setup: 3 vehicles, capacity 60 bicycles each; demand = the cell's report count, used as a proxy for how many bikes are there
+Distance: haversine, as an approximation of road distance. Production uses the Kakao Mobility distance matrix instead.
+Outputs: routes.csv, vrp_routes.png
 """
 import numpy as np
 import pandas as pd
@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from ortools.constraint_solver import routing_enums_pb2, pywrapcp
 
 stops = pd.read_csv("hotspots_top.csv").head(40).reset_index(drop=True)
-# 용량 초과 대형 지점은 여러 방문으로 분할 (실서비스 로직과 동일)
+# Stops whose demand exceeds vehicle capacity are split across visits, as in production
 MAX_PER_VISIT = 30
 split = []
 for _, r in stops.iterrows():
@@ -23,7 +23,7 @@ for _, r in stops.iterrows():
         split.append((r.lat, r.lng, take))
         d -= take
 stops = pd.DataFrame(split, columns=["lat", "lng", "n"])
-DEPOT = (40.7210, -73.9870)  # 가상 차고지(맨해튼 남부)
+DEPOT = (40.7210, -73.9870)  # a notional depot in lower Manhattan
 lats = np.concatenate([[DEPOT[0]], stops.lat.to_numpy()])
 lngs = np.concatenate([[DEPOT[1]], stops.lng.to_numpy()])
 demand = [0] + stops.n.astype(int).tolist()
@@ -44,7 +44,7 @@ rt.SetArcCostEvaluatorOfAllVehicles(
     rt.RegisterTransitCallback(lambda i, j: int(D[mgr.IndexToNode(i)][mgr.IndexToNode(j)])))
 dcb = rt.RegisterUnaryTransitCallback(lambda i: demand[mgr.IndexToNode(i)])
 rt.AddDimensionWithVehicleCapacity(dcb, 0, [CAP]*V, True, "cap")
-# 용량 초과분은 이월 허용(수요 큰 지점 우선 수거)
+# Any remainder carries over to the next run; the largest demands are collected first
 for node in range(1, N):
     rt.AddDisjunction([mgr.NodeToIndex(node)], 100000 * demand[node])
 

@@ -8,14 +8,15 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>BIKE LOOP</string>
-	<!-- iOS 권한 안내문 — 없으면 사진/위치 접근 시 앱이 즉시 종료되고
-	     App Store 심사에서도 반려된다. 문구는 사용자에게 그대로 표시된다. -->
+	<!-- iOS permission strings. Without them the app is killed the moment it touches the
+	     camera, photos or location, and App Store review rejects it. These texts are shown
+	     to the user verbatim. -->
 	<key>NSCameraUsageDescription</key>
-	<string>방치된 자전거를 촬영해 신고하기 위해 카메라를 사용합니다.</string>
+	<string>The camera is used to photograph an abandoned bicycle for a report.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>이미 촬영해 둔 자전거 사진으로 신고하기 위해 사진에 접근합니다.</string>
+	<string>Photo access is used to file a report with a picture you already took.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>신고할 자전거의 위치를 자동으로 잡아주기 위해 현재 위치를 사용합니다. 위치는 지도에서 직접 수정할 수 있습니다.</string>
+	<string>Your current location is used to fill in where the bicycle is. You can adjust it on the map.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

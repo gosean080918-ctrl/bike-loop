@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../const/value/constants.dart';
 
-/// 비공개 버킷 사진 표시용: Storage 경로 → 서명 URL → 이미지
+/// Displays a photo from the private bucket: Storage path -> signed URL -> image
 class SignedPhoto extends StatelessWidget {
   final String path;
   final double size;

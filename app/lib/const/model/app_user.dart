@@ -1,4 +1,4 @@
-/// profiles 테이블 (supabase/01_schema.sql)
+/// The profiles table (supabase/01_schema.sql)
 class Profile {
   final String id;
   final String role; // 'user' | 'admin'

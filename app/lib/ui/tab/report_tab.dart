@@ -11,7 +11,8 @@ import '../../state_management/providers.dart';
 import '../../utils/romanize.dart';
 import '../route/location_picker_screen.dart';
 
-/// RPT-01~04: 사진 → 현재 위치 자동 + 지도 조정 → 상태 유형(5종)+설명 → 중복 확인 → 제출
+/// RPT-01 to 04: photo -> automatic current location, adjustable on the map -> one of five
+/// condition types plus a description -> duplicate check -> submit
 class ReportTab extends ConsumerStatefulWidget {
   const ReportTab({super.key});
 
@@ -24,32 +25,32 @@ class _ReportTabState extends ConsumerState<ReportTab> {
   final _description = TextEditingController();
   File? _photo;
   double? _lat, _lng;
-  String? _address; // 역지오코딩 결과 (표시용, 제출 시 함께 저장)
-  String? _condition; // kConditionLabels 키
+  String? _address; // reverse-geocoding result: shown on screen and stored with the report
+  String? _condition; // a kConditionLabels key
   bool _busy = false;
   bool _locating = false;
 
-  /// ★ GPS 레이스 방지 플래그 (2026-07-21에 이 버그로 GPS를 통째로 뺐던 이력)
-  /// 사용자가 지도/검색으로 위치를 한 번이라도 확정하면 true.
-  /// 이후 GPS 응답이 늦게 도착해도 절대 덮어쓰지 않는다.
+  /// Guard against a GPS race. This bug once caused GPS to be removed entirely (2026-07-21).
+  /// Becomes true as soon as the user confirms a location on the map or by search.
+  /// After that, a late GPS response must never overwrite it.
   bool _userPickedLocation = false;
 
   @override
   void initState() {
     super.initState();
-    // 전국 서비스(2026-08-12): 신고 시작 시 신고자의 현재 위치를 먼저 잡아준다.
-    // 어디까지나 '초기 후보값'이며, 사용자가 지도에서 얼마든지 수정할 수 있다.
+    // Nationwide (2026-08-12): capture the reporter's current position up front.
+    // This is only a starting suggestion; the user can change it freely on the map.
     WidgetsBinding.instance.addPostFrameCallback((_) => _locateMe());
   }
 
-  /// 현재 위치 → 좌표 + 주소. 실패해도 조용히 넘어간다(수동 선택 가능).
+  /// Current position -> coordinates and address. Failures pass silently; manual picking still works.
   Future<void> _locateMe({bool force = false}) async {
     if (_locating) return;
-    if (!force && _userPickedLocation) return; // 사용자 확정값 보호
+    if (!force && _userPickedLocation) return; // protect a location the user confirmed
     setState(() => _locating = true);
     try {
       final pos = await ref.read(locationServiceProvider).getCurrentPosition();
-      // 응답이 오는 사이 사용자가 직접 골랐다면 덮어쓰지 않는다
+      // If the user picked a location while this was in flight, do not overwrite it
       if (!mounted || (!force && _userPickedLocation)) return;
       if (pos == null || !isInKorea(pos.latitude, pos.longitude)) {
         if (mounted && force) {
@@ -70,12 +71,12 @@ class _ReportTabState extends ConsumerState<ReportTab> {
     }
   }
 
-  /// 좌표 → 주소 (서버 프록시). 실패하면 좌표를 그대로 표시한다.
+  /// Coordinates -> address via the server proxy; on failure the coordinates are shown as-is.
   Future<void> _fillAddress(double lat, double lng) async {
     final addr =
         await ref.read(reportServiceProvider).reverseGeocode(lat, lng);
     if (!mounted) return;
-    // 그 사이 위치가 또 바뀌었으면 무시
+    // Ignore the result if the location changed again meanwhile
     if (_lat != lat || _lng != lng) return;
     setState(() => _address = addr);
   }
@@ -87,7 +88,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
     setState(() => _photo = File(img.path));
   }
 
-  /// RPT-02: 지도에서 위치 미세 조정
+  /// RPT-02: fine-tune the location on the map
   Future<void> _adjustLocation() async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
@@ -102,7 +103,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
         _lat = result.latitude;
         _lng = result.longitude;
         _address = null;
-        _userPickedLocation = true; // 이후 GPS가 덮어쓰지 못하게 잠금
+        _userPickedLocation = true; // lock it so GPS cannot overwrite it
       });
       await _fillAddress(result.latitude, result.longitude);
     }
@@ -113,7 +114,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
     if (user == null || _photo == null || _lat == null || _condition == null) {
       return;
     }
-    // 서비스 지역(대한민국) 밖 신고 불가
+    // Reports outside the service area are not accepted
     if (!isInKorea(_lat!, _lng!)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('$kOutOfServiceMsg — please pick a location in Korea')));
@@ -122,7 +123,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
     setState(() => _busy = true);
     final service = ref.read(reportServiceProvider);
     try {
-      // 제출 전 중복 확인 (30m 반경)
+      // Duplicate check before submitting (30 m radius)
       final nearby = await service.findNearby(_lat!, _lng!);
       if (nearby.isNotEmpty && mounted) {
         final proceed = await showDialog<bool>(
@@ -156,11 +157,11 @@ class _ReportTabState extends ConsumerState<ReportTab> {
         lng: _lng!,
         condition: _condition!,
         description: _description.text.trim(),
-        address: _address, // 이미 얻어둔 주소가 있으면 재조회 없이 사용
+        address: _address, // reuse the address already resolved, avoiding another lookup
       );
       ref.invalidate(myReportsProvider);
       ref.invalidate(activeReportsProvider);
-      ref.invalidate(pendingReportsProvider); // 관리자 검토 탭 갱신
+      ref.invalidate(pendingReportsProvider); // refresh the admin review tab
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Report submitted. Thank you!')));
@@ -173,7 +174,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
           _userPickedLocation = false;
           _description.clear();
         });
-        _locateMe(); // 다음 신고를 위해 현재 위치 다시 잡아둔다
+        _locateMe(); // re-acquire the position, ready for the next report
       }
     } catch (e) {
       if (mounted) {
@@ -195,7 +196,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. 사진 (RPT-01) — 시안: 대시 보더 타일 + 미리보기
+          // 1. Photo (RPT-01) — mockup: dashed-border tile with a preview
           const SectionTitle('Photo', required: true),
           const SizedBox(height: 10),
           _photo == null
@@ -285,7 +286,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
           ],
           const SizedBox(height: 22),
 
-          // 2. 위치 (시안: 흰 카드 + 초록 점 + '수정' 링크)
+          // 2. Location — mockup: white card, green dot, "edit" link
           const SectionTitle('Location'),
           const SizedBox(height: 10),
           Container(
@@ -354,7 +355,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    // 지역 배지 — 어느 지자체가 처리하게 되는지 미리 보여준다
+                    // Region badge: shows in advance which authority will handle this
                     if (regionOf(_address) != null)
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -387,7 +388,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
           ),
           const SizedBox(height: 22),
 
-          // 3. 상태 유형 선택 (RPT-03, 기획안 5종)
+          // 3. Condition type (RPT-03; the five types from the plan)
           const SectionTitle('Condition', required: true),
           const SizedBox(height: 4),
           Wrap(
@@ -403,7 +404,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
           ),
           const SizedBox(height: 12),
 
-          // 4. 간단한 설명 (RPT-03)
+          // 4. A short description (RPT-03)
           const SectionTitle('Description', hint: '(optional)'),
           const SizedBox(height: 10),
           TextField(
@@ -418,7 +419,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
           ),
           const SizedBox(height: 14),
 
-          // 5. 제출 (RPT-04 + 중복 확인) — 시안 CTA
+          // 5. Submit (RPT-04 plus the duplicate check) — the mockup's CTA
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),

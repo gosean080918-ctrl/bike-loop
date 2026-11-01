@@ -6,7 +6,7 @@ import '../../state_management/providers.dart';
 import 'auth_screen.dart';
 import 'home_screen.dart';
 
-/// AUTH-01: 스플래시 + 로그인 여부 분기
+/// AUTH-01: splash screen, then branch on whether the user is signed in
 class SplashScreen extends ConsumerWidget {
   const SplashScreen({super.key});
 

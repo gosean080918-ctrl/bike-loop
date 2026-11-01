@@ -7,7 +7,7 @@ import '../../const/value/constants.dart';
 import '../../state_management/providers.dart';
 import '../component/signed_photo.dart';
 
-/// RPT-06: 내 신고 이력 — Claude Design 시안 ③ 레이아웃
+/// RPT-06: the user's report history, laid out as in mockup screen 3
 class MyReportsTab extends ConsumerWidget {
   const MyReportsTab({super.key});
 
@@ -27,7 +27,7 @@ class MyReportsTab extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
             children: [
-              // 시안 헤더: 큰 제목 + 요약
+              // Mockup header: large title plus a summary line
               const Text('My Reports',
                   style: TextStyle(
                       fontSize: 24,
@@ -48,7 +48,7 @@ class MyReportsTab extends ConsumerWidget {
                           style: TextStyle(color: AppColors.muted))),
                 ),
 
-              // 시안 카드: 사진72 + [배지·날짜 / 주소 / 유형] + ›
+              // Mockup card: 72px photo, then [badge and date / address / type], then a chevron
               ...list.map((r) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Container(

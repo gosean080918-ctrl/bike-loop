@@ -8,8 +8,9 @@ import '../../state_management/providers.dart';
 import '../../utils/romanize.dart';
 import '../component/signed_photo.dart';
 
-/// ADM-08: 수거 완료 재고 목록 — 관리번호/사진/신고위치/신고일/수거일/
-/// 보관장소/상태. 상태 필터 + 관리번호 검색 + 상세에서 상태·보관장소 변경.
+/// ADM-08: collected inventory — ID number, photo, report location, report date,
+/// collection date, storage location and state. Filter by state, search by ID number,
+/// and change state or storage location from the detail sheet.
 class AdminInventoryTab extends ConsumerStatefulWidget {
   const AdminInventoryTab({super.key});
 
@@ -19,10 +20,10 @@ class AdminInventoryTab extends ConsumerStatefulWidget {
 }
 
 class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
-  String? _stateFilter; // null = 전체
+  String? _stateFilter; // null = all
   final _search = TextEditingController();
   List<Map<String, dynamic>> _bikes = [];
-  Map<String, int> _summary = {}; // 상태별 집계(필터와 무관하게 전체)
+  Map<String, int> _summary = {}; // counts per state, always over everything, ignoring the filter
   int _total = 0;
   bool _loading = true;
 
@@ -40,7 +41,7 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
         state: _stateFilter,
         query: _search.text,
       );
-      // 요약은 필터와 무관하게 전체 기준으로 집계
+      // The summary is computed over everything, regardless of the filter
       final all = await admin.fetchBikes(limit: 1000);
       final counts = <String, int>{};
       for (final b in all) {
@@ -64,7 +65,7 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
     }
   }
 
-  /// 재고 항목 삭제 (신고 기록은 보존)
+  /// Delete an inventory item; the report record is preserved
   Future<void> _deleteBike(Map<String, dynamic> b) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -209,7 +210,7 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
     );
   }
 
-  /// 상단 요약 대시보드 — 총보유 + 상태별 대수
+  /// Summary panel at the top: total held, plus a count per state
   Widget _summaryCard() {
     (Color, Color) colorOf(String key) => switch (key) {
           'storage' => (AppColors.pendingBg, AppColors.pendingFg),
@@ -297,9 +298,9 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
 
     return Column(
       children: [
-        // 상단 요약 대시보드
+        // Summary panel
         if (!_loading) _summaryCard(),
-        // 검색 + 필터
+        // Search and filter
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: TextField(

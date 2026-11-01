@@ -1,9 +1,10 @@
 """
-BikeReclaim 최적화 엔진 v2 — 이강혁 프레임워크 이식판.
-원본: main.py (2026-07-21 공유). 서버용 변경점:
-  - matplotlib/numpy/샘플데이터/시각화/print 제거
-  - build_pickup_options의 전역 locations 참조 버그 → 파라미터로 수정
-파라미터 튜닝은 server/.env 의 OPT_* 값으로 한다 (optimizer.py 참고).
+BIKE LOOP optimization engine v2, ported from an external framework.
+Changes made for server use:
+  - removed matplotlib / numpy / sample data / plotting / print statements
+  - fixed a bug where build_pickup_options referenced a global `locations`
+    (now passed as a parameter)
+Tune behaviour through the OPT_* values in server/.env (see optimizer.py).
 """
 from math import atan2, ceil, cos, radians, sin, sqrt
 from datetime import datetime
@@ -13,11 +14,11 @@ from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
 
 # ============================================================
-# 1. 설정
+# 1. Configuration
 # ============================================================
 
-# exact max-age 정렬 대신 신고 경과일을 urgency tier로 구분한다.
-# min_age가 큰 tier부터 검사되므로 내림차순으로 작성한다.
+# Rather than sorting by exact age, reports are bucketed into urgency tiers.
+# Tiers are checked from the largest min_age down, so keep this list descending.
 URGENCY_TIERS = [
     {
         "label": "Critical",
@@ -47,7 +48,7 @@ URGENCY_TIERS = [
 
 
 # ============================================================
-# 2. 샘플 데이터
+# 2. Sample data
 # ============================================================
 
 def make_bike(
@@ -63,13 +64,14 @@ def make_bike(
     pickup_minutes=4,
 ):
     """
-    샘플 자전거 레코드를 생성한다.
+    Build sample bicycle records.
 
-    duplicate 여부는 자동 판별하지 않는다. 각 신고 레코드를 독립된
-    자전거 1대로 취급한다.
+    Duplicates are not inferred. Every report record is treated as one
+    independent bicycle.
 
-    active/collectible 값은 현장 시스템에서 명시적으로 제공되는 경우에만
-    사용한다. 코드가 신고의 진위 여부를 추론하지는 않는다.
+    The active / collectible flags are honoured only when the operational
+    system supplies them explicitly. This code never guesses whether a report
+    is genuine.
     """
 
     return {
@@ -87,15 +89,16 @@ def make_bike(
 
 
 # ============================================================
-# 3. 기본 계산 함수
+# 3. Basic computations
 # ============================================================
 
 def haversine_distance_m(lat1, lon1, lat2, lon2):
     """
-    두 위경도 좌표 사이의 직선거리(m)를 계산한다.
+    Straight-line distance in metres between two lat/lng coordinates.
 
-    hotspot 생성에는 직선거리를 사용한다. 실제 차량 경로에서는
-    Kakao Mobility 등의 도로 거리/시간 matrix로 교체하는 것이 좋다.
+    Hotspot construction uses straight-line distance. For actual vehicle
+    routing this should be replaced with a road distance/time matrix such as
+    the one from Kakao Mobility.
     """
 
     earth_radius_m = 6_371_000
@@ -142,20 +145,20 @@ def get_urgency(days_old):
         if days_old >= tier["min_age"]:
             return tier
 
-    # URGENCY_TIERS에 Normal tier가 있으므로 실제로는 도달하지 않는다.
+    # Unreachable in practice because URGENCY_TIERS ends with a Normal tier.
     return URGENCY_TIERS[-1]
 
 
 def calculate_bike_priority(bike, days_old):
     """
-    개별 자전거의 수거 편익(priority points)을 계산한다.
+    Compute the collection benefit (priority points) of one bicycle.
 
-    - 신고 경과일이 길수록 priority 증가
-    - SLA에 가까운 순서가 아니라 tier를 넘을 때 추가 bonus 부여
-    - hazard_score가 제공되면 위험도 반영
-    - confidence가 제공되면 현장 존재 가능성 반영
+    - priority grows with the number of days since the report
+    - a bonus is granted on crossing a tier boundary, not by proximity to an SLA
+    - hazard_score, when supplied, folds in how dangerous the bike is
+    - confidence, when supplied, folds in how likely it is still on site
 
-    confidence와 hazard_score가 데이터에 없다면 각각 1.0과 0을 사용한다.
+    Missing confidence and hazard_score default to 1.0 and 0 respectively.
     """
 
     urgency = get_urgency(days_old)
@@ -173,15 +176,16 @@ def calculate_bike_priority(bike, days_old):
 
 
 # ============================================================
-# 4. 반경 30m의 compact hotspot 생성
+# 4. Build compact hotspots with a 30 m radius
 # ============================================================
 
 def get_eligible_bike_nodes(locations, start_index, end_index):
     """
-    시스템에 명시적으로 active=False 또는 collectible=False로 저장된
-    신고만 제외한다.
+    Excludes only the reports explicitly stored as active=False or
+    collectible=False.
 
-    duplicate 탐지나 좌표/사진 기반의 신고 진위 추론은 수행하지 않는다.
+    No duplicate detection, and no inference about a report's authenticity from
+    coordinates or photos.
     """
 
     return [
@@ -201,13 +205,13 @@ def create_compact_clusters(
     cluster_radius_m=30,
 ):
     """
-    모든 cluster 구성원이 하나의 anchor bike로부터 30m 이내에 있도록
-    hotspot을 생성한다.
+    Build hotspots such that every cluster member lies within 30 m of a single
+    anchor bike.
 
-    기존 connected-component 방식은 A-B와 B-C가 각각 30m 이내이면
-    A-C가 30m보다 멀어도 같은 cluster가 되는 chaining 문제가 있었다.
-    여기서는 아직 배정되지 않은 자전거를 가장 많이 포함하는 30m 원을
-    반복 선택하므로 각 cluster의 반경을 명시적으로 제한한다.
+    A naive connected-component approach chains: if A-B and B-C are each within
+    30 m, A and C join the same cluster even when they are much further apart.
+    Instead this repeatedly picks the 30 m circle covering the most unassigned
+    bicycles, which bounds each cluster's radius explicitly.
     """
 
     unassigned = set(
@@ -252,7 +256,7 @@ def create_compact_clusters(
 
 
 # ============================================================
-# 5. Cluster 통계와 priority 계산
+# 5. Cluster statistics and priority
 # ============================================================
 
 def build_cluster_info(
@@ -300,7 +304,7 @@ def build_cluster_info(
                 ),
             })
 
-        # 부분 수거 시 이 순서의 앞에서부터 선택한다.
+        # Partial pickups take bicycles from the front of this ordering.
         bike_data.sort(
             key=lambda item: (
                 item["priority_points"],
@@ -382,8 +386,8 @@ def build_cluster_info(
             ),
         })
 
-    # 이 ranking은 설명용이다. 실제 선택은 route cost와 capacity까지
-    # 포함하여 OR-Tools가 joint optimization으로 결정한다.
+    # This ranking is explanatory only. The actual selection is made by
+    # OR-Tools, jointly with route cost and capacity.
     cluster_info.sort(
         key=lambda cluster: (
             cluster["urgency_level"],
@@ -401,7 +405,7 @@ def build_cluster_info(
 
 
 # ============================================================
-# 6. Cluster별 수거량 대안 생성
+# 6. Generate pickup-quantity options per cluster
 # ============================================================
 
 def build_pickup_options(
@@ -412,15 +416,15 @@ def build_pickup_options(
     required_nodes=None,
 ):
     """
-    각 cluster에 대해 다음과 같은 대안을 생성한다.
+    For each cluster, generate these options:
 
-        q=0: cluster를 방문하지 않음
-        q=1: 가장 중요한 자전거 1대 수거
+        q=0: do not visit the cluster
+        q=1: collect the single most important bicycle
         ...
-        q=n: cluster 전체 수거 + completion bonus
+        q=n: collect the whole cluster, plus a completion bonus
 
-    q=0은 별도의 node 없이 해당 cluster의 모든 대안을 drop하는 것으로
-    표현한다.
+    q=0 needs no node of its own: it is expressed by dropping every option
+    belonging to that cluster.
     """
 
     options = []
@@ -444,8 +448,8 @@ def build_pickup_options(
             if fully_collected:
                 reward_points += cluster["completion_bonus"]
 
-            # 관리자가 명시적으로 지정한 노드(required)를 모두 포함하는
-            # 대안인지 표시. 최적화 단계에서 이 대안을 필수 방문으로 다룬다.
+            # Mark options that cover every administrator-selected (required)
+            # node; the solver treats such an option as a mandatory visit.
             cluster_required = [
                 node for node in cluster["nodes"]
                 if required_nodes and node in required_nodes
@@ -527,7 +531,8 @@ def build_problem_points(
 
 
 def build_point_distance_matrix(points):
-    # OR-Tools transit callback은 int64를 요구하므로 반드시 정수화한다.
+    # OR-Tools transit callbacks require int64, so every value must be an integer.
+    # (Returning floats here fails silently and produces wrong routes.)
     return [
         [
             0 if i == j else int(round(point_distance_m(points[i], points[j])))
@@ -553,19 +558,19 @@ def optimize_collection_and_route(
     has_required=False,
 ):
     """
-    OR-Tools가 다음을 동시에 결정한다.
+    OR-Tools decides all of the following at once:
 
-    1. 방문할 cluster
-    2. 각 cluster에서 수거할 자전거 수
-    3. Start -> selected clusters -> Storage 방문 순서
+    1. which clusters to visit
+    2. how many bicycles to collect at each cluster
+    3. the visiting order: start -> selected clusters -> storage
 
     Objective:
         travel distance
         + service-time equivalent cost
         + dropped-priority penalties
 
-    priority_value_m_per_point가 클수록 신고 priority를 이동거리보다 더
-    중요하게 취급한다. 운영 정책에 맞게 calibration해야 하는 값이다.
+    A larger priority_value_m_per_point weights report priority more heavily
+    against travel distance. Calibrate it to the operator's policy.
     """
 
     points = build_problem_points(
@@ -606,7 +611,7 @@ def optimize_collection_and_route(
     routing.SetArcCostEvaluatorOfAllVehicles(cost_callback_index)
 
     # --------------------------------------------------------
-    # 실제 route time constraint
+    # Route time constraint
     # --------------------------------------------------------
 
     meters_per_minute = average_speed_kmh * 1000 / 60
@@ -636,7 +641,7 @@ def optimize_collection_and_route(
     time_dimension = routing.GetDimensionOrDie("Time")
 
     # --------------------------------------------------------
-    # 차량 적재량 constraint
+    # Vehicle capacity constraint
     # --------------------------------------------------------
 
     def demand_callback(from_index):
@@ -655,14 +660,14 @@ def optimize_collection_and_route(
     )
 
     # --------------------------------------------------------
-    # 수거하지 않은 priority는 penalty로 처리
+    # Uncollected priority is charged as a penalty.
     #
-    # 모든 option을 개별 optional node로 만든 뒤, 같은 cluster에서는
-    # 최대 하나의 quantity option만 활성화할 수 있도록 제한한다.
+    # Every option becomes its own optional node; a constraint then allows
+    # at most one quantity option per cluster to be active.
     # --------------------------------------------------------
 
     option_indices_by_cluster = {}
-    # 필수 방문(required) 노드를 모두 담는 대안들
+    # Options that cover all required nodes
     required_option_indices_by_cluster = {}
 
     for local_node in range(1, end_local_node):
@@ -703,8 +708,8 @@ def optimize_collection_and_route(
             <= 1
         )
 
-    # A안: 관리자가 지정한 노드가 있는 cluster는 반드시 방문하고,
-    # 그 노드들을 모두 포함하는 수거량 대안 중 하나를 선택하게 한다.
+    # Mandatory-visit rule: a cluster containing administrator-selected nodes
+    # must be visited, choosing one of the options that covers all of them.
     if has_required:
         for routing_indices in required_option_indices_by_cluster.values():
             solver.Add(
@@ -738,7 +743,7 @@ def optimize_collection_and_route(
         return None
 
     # --------------------------------------------------------
-    # 결과 추출
+    # Extract the solution
     # --------------------------------------------------------
 
     route_local_nodes = []
@@ -813,7 +818,7 @@ def optimize_collection_and_route(
 
 
 # ============================================================
-# 8. 전체 문제 실행
+# 8. Solve the full problem
 # ============================================================
 
 def solve_bike_loop(
@@ -833,8 +838,9 @@ def solve_bike_loop(
     search_seconds=10,
     required_nodes=None,
 ):
-    """required_nodes: 관리자가 직접 선택해 반드시 수거해야 하는 노드 집합.
-    지정되면 비용·편익 판단과 무관하게 방문한다(용량·시간 제약은 유지)."""
+    """required_nodes: nodes the administrator selected and that must be collected.
+    When present they are visited regardless of the cost/benefit trade-off,
+    while capacity and time constraints still apply."""
     if current_date is None:
         current_date = datetime.now()
 
@@ -880,8 +886,8 @@ def solve_bike_loop(
 
     if route_result is None:
         raise RuntimeError(
-            "주어진 route-time/capacity 조건에서 feasible route를 "
-            "찾지 못했습니다."
+            "No feasible route under the given route-time and capacity "
+            "constraints."
         )
 
     return {
@@ -892,5 +898,5 @@ def solve_bike_loop(
 
 
 # ============================================================
-# 9. 결과 출력
+# 9. Report the result
 # ============================================================

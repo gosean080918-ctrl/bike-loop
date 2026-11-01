@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../const/value/constants.dart';
 import 'api_client.dart';
 
-/// 출발지/복귀지(보관소) 설정
+/// Depot settings: where a route starts and where it returns
 class DepotConfig {
   final double lat;
   final double lng;
@@ -27,8 +27,8 @@ class DepotConfig {
       (lat - returnLat).abs() < 1e-9 && (lng - returnLng).abs() < 1e-9;
 }
 
-/// 출발지/복귀지 저장 (기기 로컬 저장소)
-/// 최초 실행 시 기본 주소(글로벌에듀로304번길 10)를 검색 API로 좌표 해석.
+/// Stores the start and return points in local device storage
+/// On first run, the default address is resolved to coordinates through the search API.
 class SettingsService {
   static const _kDepotLat = 'depot_lat';
   static const _kDepotLng = 'depot_lng';
@@ -44,7 +44,7 @@ class SettingsService {
     var addr = p.getString(_kDepotAddr);
 
     if (lat == null || lng == null) {
-      // 최초 1회: 기본 보관소 주소를 좌표로 해석
+      // First run only: resolve the default depot address into coordinates
       final resolved = await _resolveAddress(kDefaultDepotAddress);
       lat = resolved.$1;
       lng = resolved.$2;
@@ -80,7 +80,7 @@ class SettingsService {
     await p.setString(_kRetAddr, address ?? '');
   }
 
-  /// 복귀지를 출발지와 동일하게 초기화
+  /// Reset the return point to match the start point
   Future<void> clearReturn() async {
     final p = await SharedPreferences.getInstance();
     await p.remove(_kRetLat);
@@ -88,8 +88,8 @@ class SettingsService {
     await p.remove(_kRetAddr);
   }
 
-  /// 주소 → 좌표 (서버 /search 경유). 실패하면 null.
-  /// 지역별 기본 보관소(도청/시청) 좌표를 얻을 때 사용.
+  /// Address -> coordinates via the server's /search endpoint; null on failure.
+  /// Used to look up each region's default depot (a provincial or city office).
   Future<(double, double, String)?> resolveAddress(String query) async {
     try {
       final res = await ApiClient.get(
@@ -111,10 +111,10 @@ class SettingsService {
     return null;
   }
 
-  /// 주소 → 좌표 (실패 시 전국 중심 좌표로 폴백)
+  /// Address -> coordinates, falling back to the centre of the country on failure
   Future<(double, double, String)> _resolveAddress(String query) async {
     final r = await resolveAddress(query);
-    // 서버가 꺼져 있으면 전국 중심으로 폴백 (관리자가 지도에서 바꾸면 됨)
+    // If the server is down, fall back to the national centre; an admin can move it on the map
     return r ?? (kDefaultLat, kDefaultLng, query);
   }
 }

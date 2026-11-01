@@ -1,23 +1,22 @@
 """
-서버 접근 통제 (2026-09-15, 일반 공개 대비)
+Server access control (2026-09-15, added before the public launch).
 
-[왜 필요한가]
-이 서버의 /address · /search 는 카카오 REST 키를 대신 호출해 준다.
-인증 없이 열어두면 누구나 주소·검색 API를 무제한으로 호출할 수 있고,
-그 요금과 할당량은 전부 우리(의뢰자) 부담이 된다.
-저장소를 공개하거나 앱을 스토어에 올리면 서버 주소도 알려지므로
-'로그인한 우리 앱 사용자만' 호출할 수 있게 막아야 한다.
+[Why this exists]
+/address and /search call the Kakao REST API on the caller's behalf. Left open,
+anyone could hit them without limit and the quota and the bill would land on us.
+Publishing the repository or shipping the app also publishes the server URL, so
+access has to be restricted to signed-in users of our own app.
 
-[어떻게 막는가]
-앱이 Supabase 로그인 토큰(access token)을 Authorization 헤더로 보낸다.
-서버는 그 토큰이 진짜인지 Supabase에 물어보고, 맞으면 통과시킨다.
-- 토큰 검증 결과는 짧게 캐시해 매번 왕복하지 않는다.
-- 사용자별 호출 횟수를 제한해 한 계정이 폭주하는 것도 막는다.
+[How it works]
+The app sends its Supabase access token in the Authorization header. The server
+asks Supabase whether that token is genuine and lets the request through if so.
+- Verification results are cached briefly so we do not round-trip on every call.
+- Calls are rate-limited per user so a single account cannot flood the service.
 
-[설계 선택]
-JWT 서명을 직접 검증하는 방법도 있지만, Supabase가 프로젝트마다
-서명 방식(대칭키/비대칭키)을 다르게 쓰기 때문에 환경에 따라 깨진다.
-Supabase에 직접 물어보는 방식은 어떤 프로젝트에서도 똑같이 동작한다.
+[Design choice]
+Verifying the JWT signature locally is possible, but Supabase projects differ in
+signing scheme (symmetric vs asymmetric), so that approach breaks depending on the
+environment. Asking Supabase directly behaves identically on every project.
 """
 import os
 import time
@@ -29,14 +28,14 @@ from fastapi import Header, HTTPException
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 
-# 개발 중에는 인증을 끌 수 있다. 운영에서는 절대 true로 두지 말 것.
+# Can be disabled during local development. Never set this true in production.
 AUTH_DISABLED = os.getenv("AUTH_DISABLED", "").lower() in ("1", "true", "yes")
 
-# 토큰 검증 캐시 (토큰 → (사용자ID, 만료시각))
+# Verification cache: token -> (user id, expiry timestamp)
 _CACHE_TTL = int(os.getenv("AUTH_CACHE_SECONDS", "300"))
 _cache: dict[str, tuple[str, float]] = {}
 
-# 사용자별 호출 제한: 기본 분당 60회
+# Per-user rate limit: 60 calls per minute by default
 _RATE_LIMIT = int(os.getenv("RATE_LIMIT_PER_MIN", "60"))
 _calls: dict[str, deque] = {}
 
@@ -47,14 +46,14 @@ def _rate_check(user_id: str) -> None:
     while q and now - q[0] > 60:
         q.popleft()
     if len(q) >= _RATE_LIMIT:
-        raise HTTPException(429, "요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.")
+        raise HTTPException(429, "Too many requests. Please try again shortly.")
     q.append(now)
 
 
 def _verify_with_supabase(token: str) -> str:
-    """Supabase에 토큰을 물어보고 사용자 ID를 돌려준다. 실패하면 401."""
+    """Ask Supabase to validate the token and return the user id; 401 on failure."""
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-        # 설정이 빠진 채로 배포되면 '누구나 통과'가 되지 않도록 막는다
+        # If the deployment is missing config, fail closed rather than letting everyone in
         raise HTTPException(
             500, "server auth is not configured (SUPABASE_URL / SUPABASE_ANON_KEY)"
         )
@@ -71,26 +70,26 @@ def _verify_with_supabase(token: str) -> str:
         raise HTTPException(503, f"auth check failed: {e}") from e
 
     if r.status_code != 200:
-        raise HTTPException(401, "로그인이 필요합니다 (invalid token)")
+        raise HTTPException(401, "Login required (invalid token)")
     uid = (r.json() or {}).get("id")
     if not uid:
-        raise HTTPException(401, "로그인이 필요합니다 (no user)")
+        raise HTTPException(401, "Login required (no user)")
     return uid
 
 
 def require_user(authorization: str = Header(default="")) -> str:
     """
-    FastAPI 의존성. 모든 보호 엔드포인트에 붙인다.
-    성공하면 사용자 ID를 반환한다.
+    FastAPI dependency applied to every protected endpoint.
+    Returns the user id on success.
     """
     if AUTH_DISABLED:
         return "auth-disabled"
 
     if not authorization.lower().startswith("bearer "):
-        raise HTTPException(401, "로그인이 필요합니다 (missing token)")
+        raise HTTPException(401, "Login required (missing token)")
     token = authorization[7:].strip()
     if not token:
-        raise HTTPException(401, "로그인이 필요합니다 (empty token)")
+        raise HTTPException(401, "Login required (empty token)")
 
     now = time.time()
     hit = _cache.get(token)
@@ -101,7 +100,7 @@ def require_user(authorization: str = Header(default="")) -> str:
     uid = _verify_with_supabase(token)
     _cache[token] = (uid, now + _CACHE_TTL)
 
-    # 캐시가 무한정 커지지 않도록 만료분 정리
+    # Drop expired entries so the cache cannot grow without bound
     if len(_cache) > 1000:
         for k, (_, exp) in list(_cache.items()):
             if exp <= now:

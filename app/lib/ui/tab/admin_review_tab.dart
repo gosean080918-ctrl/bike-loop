@@ -9,7 +9,7 @@ import '../../utils/romanize.dart';
 import '../component/signed_photo.dart';
 import '../route/report_detail_screen.dart';
 
-/// ADM-01/02: 신규 신고 검토 — 승인 / 반려 / 중복 처리
+/// ADM-01/02: review new reports — approve, reject, or mark as duplicate
 class AdminReviewTab extends ConsumerWidget {
   const AdminReviewTab({super.key});
 
@@ -61,8 +61,8 @@ class AdminReviewTab extends ConsumerWidget {
     }
   }
 
-  /// 카드 탭 → 상세 화면. 상세에서 누른 버튼을 문자열로 돌려받아
-  /// 기존 처리 로직(_act/_duplicate)을 그대로 재사용한다.
+  /// Tapping a card opens the detail screen, which returns the pressed button as a
+  /// string so the existing handlers (_act / _duplicate) can be reused as they are.
   Future<void> _openDetail(
       BuildContext context, WidgetRef ref, Report r) async {
     final action = await Navigator.push<String>(
@@ -114,7 +114,7 @@ class AdminReviewTab extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 카드 상단(사진+정보)을 탭하면 상세 화면
+                      // Tapping the top of the card (photo and details) opens the detail screen
                       InkWell(
                         onTap: () => _openDetail(context, ref, r),
                         borderRadius: BorderRadius.circular(12),

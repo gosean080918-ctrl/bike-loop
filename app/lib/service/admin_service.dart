@@ -6,11 +6,11 @@ import '../const/model/report.dart';
 import '../const/value/constants.dart';
 import 'api_client.dart';
 
-/// 관리자 기능 (ADM-01~07): 검토, 수거 작업 생성/진행, 재고 등록
+/// Admin features (ADM-01 to 07): review, create and run collection jobs, register inventory
 class AdminService {
   final _client = Supabase.instance.client;
 
-  // ---------- ADM-01/02: 신고 검토 ----------
+  // ---------- ADM-01/02: report review ----------
 
   Future<List<Report>> fetchByStatus(String status, {int limit = 100}) async {
     final rows = await _client
@@ -41,7 +41,7 @@ class AdminService {
         'reviewed_at': DateTime.now().toIso8601String(),
       }).eq('id', reportId);
 
-  /// 중복 후보: 해당 신고 주변의 다른 활성 신고
+  /// Duplicate candidates: other active reports near this one
   Future<List<NearbyReport>> duplicateCandidates(Report r) async {
     final rows = await _client.rpc('find_nearby_reports', params: {
       'p_lat': r.lat,
@@ -54,10 +54,10 @@ class AdminService {
         .toList();
   }
 
-  // ---------- ADM-03/04: 수거 작업 생성 ----------
+  // ---------- ADM-03/04: creating a collection job ----------
 
-  /// /optimize 호출 → collection_jobs + job_stops 저장 → 신고 상태 scheduled
-  /// 반환: jobId
+  /// Call /optimize, save collection_jobs and job_stops, then set the reports to scheduled
+  /// Returns the jobId
   Future<String> createJob({
     required List<Report> targets,
     required double depotLat,
@@ -67,7 +67,7 @@ class AdminService {
     required int vehicleCapacity,
     required int workMinutes,
   }) async {
-    // 1) 최적화 서버 호출 (로그인 토큰 첨부 — 서버가 인증을 요구함)
+    // 1) Call the optimization server, attaching the access token it requires
     final res = await ApiClient.postJson(
       Uri.parse(kOptimizeUrl),
       jsonEncode({
@@ -84,9 +84,9 @@ class AdminService {
                       'lng': r.lng,
                       'demand': 1,
                       'priority': r.priority,
-                      // 관리자가 직접 고른 지점은 반드시 방문(A안)
+                      // Stops the admin picked explicitly are mandatory visits
                       'required': true,
-                      // v2 엔진: 신고일로 경과일/긴급도 계산
+                      // v2 engine: derives days elapsed and urgency from the report date
                       'reported_at':
                           r.reportedAt.toUtc().toIso8601String(),
                     })
@@ -99,7 +99,7 @@ class AdminService {
       throw Exception('Too many requests. Please try again shortly.');
     }
     if (res.statusCode != 200) {
-      // 서버가 설명을 준 경우 그대로 보여준다(예: 용량/시간 초과 안내)
+      // If the server explained the failure, show it as-is (e.g. over capacity or time)
       String msg = 'Server error (${res.statusCode})';
       try {
         final d = jsonDecode(utf8.decode(res.bodyBytes))['detail'];
@@ -112,14 +112,14 @@ class AdminService {
     if (routes.isEmpty) throw Exception('No route was generated');
     final route = routes.first as Map<String, dynamic>;
 
-    // 2) 작업 저장 (도로 경로가 있으면 폴리라인도 함께)
+    // 2) Save the job, including the road polyline when one is available
     final roadPath = body['road_path'] as Map<String, dynamic>?;
     final uid = _client.auth.currentUser!.id;
     final job = await _client
         .from('collection_jobs')
         .insert({
           'admin_id': uid,
-          // 구간별 색상을 위해 segments를 우선 저장(없으면 전체 polyline)
+          // Prefer segments so each leg can be coloured; fall back to the whole polyline
           if (roadPath != null)
             'route_polyline': roadPath['segments'] ?? roadPath['polyline'],
           'vehicle_capacity': vehicleCapacity,
@@ -136,7 +136,7 @@ class AdminService {
         .single();
     final jobId = job['id'] as String;
 
-    // 3) 방문 순서 저장 + 신고 상태 변경
+    // 3) Save the visit order and update the report states
     final stops = (route['stops'] as List).cast<Map<String, dynamic>>();
     await _client.from('job_stops').insert([
       for (final s in stops)
@@ -155,9 +155,9 @@ class AdminService {
     return jobId;
   }
 
-  // ---------- ADM-05/06/07: 작업 진행 ----------
+  // ---------- ADM-05/06/07: running a job ----------
 
-  /// 진행할 작업 + 방문 순서(신고 정보 포함)
+  /// The job to run, with its visit order and the underlying reports
   Future<List<Map<String, dynamic>>> fetchJobs({int limit = 20}) async {
     final rows = await _client
         .from('collection_jobs')
@@ -167,7 +167,7 @@ class AdminService {
     return (rows as List).cast<Map<String, dynamic>>();
   }
 
-  /// 지점 수거 완료: stop done + 신고 collected + 재고 등록(ADM-07)
+  /// Mark a stop collected: stop done, report collected, inventory registered (ADM-07)
   Future<void> completeStop({
     required String jobId,
     required int seq,
@@ -190,15 +190,15 @@ class AdminService {
       .from('collection_jobs')
       .update({'status': 'done'}).eq('id', jobId);
 
-  /// 신고 영구 삭제 (RLS: admin만 허용. 테스트/오입력 정리용)
-  /// ※ 사진 파일은 Storage에 남음 — 운영 전환 시 정리 배치 필요
+  /// Permanently delete a report (RLS: admins only; for clearing test or mistaken entries)
+  /// NOTE: the photo file stays in Storage — a cleanup job is needed before going live
   Future<void> deleteReport(String reportId) =>
       _client.from('reports').delete().eq('id', reportId);
 
-  // ---------- ADM-08: 재고 관리 ----------
+  // ---------- ADM-08: inventory ----------
 
-  /// 수거 완료 재고 목록 (신고 정보 조인).
-  /// [state] 필터, [query] 관리번호 검색, 수거일 내림차순.
+  /// Collected inventory, joined with the report data.
+  /// [state] filters by state, [query] searches the ID number; newest collection first.
   Future<List<Map<String, dynamic>>> fetchBikes({
     String? state,
     String? query,
@@ -214,25 +214,25 @@ class AdminService {
     return (rows as List).cast<Map<String, dynamic>>();
   }
 
-  /// 재고 상태 변경 (보관/수리/기부/재사용/폐기)
+  /// Change inventory state (storage / repair / donation / reuse / disposal)
   Future<void> updateBikeState(String bikeId, String state) =>
       _client.from('bikes').update({'state': state}).eq('id', bikeId);
 
-  /// 보관 장소 변경
+  /// Change the storage location
   Future<void> updateBikeStorage(String bikeId, String location) =>
       _client
           .from('bikes')
           .update({'storage_location': location}).eq('id', bikeId);
 
-  /// 재고 항목 삭제 — 신고 기록은 '수거 완료'로 보존한다.
-  /// (신고자 화면·이력 추적을 위해 reports는 건드리지 않음)
+  /// Delete an inventory item; the report stays on record as collected.
+  /// (reports are untouched so the reporter's history stays intact)
   Future<void> deleteBike(String bikeId) =>
       _client.from('bikes').delete().eq('id', bikeId);
 
-  // ---------- ADM-09: 대시보드 통계 ----------
+  // ---------- ADM-09: dashboard statistics ----------
 
-  /// 전체 집계 — 신고/수거/재고/최적화 효과
-  /// (Supabase 무료티어 기준 데이터량이 작아 앱에서 집계)
+  /// Overall totals: reports, collections, inventory, and the effect of optimization
+  /// (data volumes on the Supabase free tier are small enough to aggregate in the app)
   Future<Map<String, dynamic>> fetchDashboard() async {
     final reports = await _client
         .from('reports')
@@ -254,7 +254,7 @@ class AdminService {
       byStatus[s] = (byStatus[s] ?? 0) + 1;
       final c = r['condition'] as String? ?? 'other';
       byCondition[c] = (byCondition[c] ?? 0) + 1;
-      // 신고→수거 소요일수
+      // Days from report to collection
       final ca = r['collected_at'];
       if (ca != null) {
         final d = DateTime.parse(ca as String)
@@ -299,7 +299,7 @@ class AdminService {
       'collected': collected,
       'recycled': recycled,
       'disposed': disposed,
-      // 재생률 = (수리+기부+재사용) / (그것 + 폐기)
+      // Reuse rate = (repair + donation + reuse) / (that + disposal)
       'recycleRate': (recycled + disposed) == 0
           ? 0.0
           : recycled / (recycled + disposed) * 100,
@@ -307,11 +307,11 @@ class AdminService {
     };
   }
 
-  /// 수거 작업 삭제.
-  /// - job_stops는 FK cascade로 함께 삭제
-  /// - 아직 수거되지 않은(scheduled) 신고는 승인 상태로 되돌려
-  ///   다시 수거 대상으로 골라질 수 있게 한다
-  /// - 이미 수거 완료된 신고는 그대로 둔다(이력 보존)
+  /// Delete a collection job.
+  /// - job_stops are removed by the foreign-key cascade
+  /// - reports still scheduled go back to approved so they can be
+  ///   selected for collection again
+  /// - reports already collected are left alone, preserving the record
   Future<void> deleteJob(String jobId) async {
     await _client
         .from('reports')

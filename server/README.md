@@ -1,20 +1,26 @@
-# BikeReclaim 최적화 서버 (BE-03)
+# BIKE LOOP optimization server
 
-파일 5개짜리 초미니 FastAPI. 엔드포인트는 `POST /optimize` 하나
-(+ `GET /health`). OR-Tools CVRP — PoC(analysis-server/poc_nyc311) 이식판.
+A deliberately tiny FastAPI service. The main endpoint is `POST /optimize`, with
+`GET /address` and `GET /search` acting as Kakao proxies and `GET /health` reporting status.
+The solver is an OR-Tools CVRP, ported from the proof of concept in
+`analysis-server/poc_nyc311`.
 
-## 로컬 실행
+## Running locally
 
 ```bash
 cd server
 pip install -r requirements.txt
+cp .env.example .env      # fill in the Kakao REST key and Supabase URL / anon key
 uvicorn main:app --reload
-# http://127.0.0.1:8000/docs 에서 스웨거 UI로 바로 테스트 가능
+# Swagger UI for ad-hoc testing: http://127.0.0.1:8000/docs
 ```
 
-테스트: `python test_optimize.py` (3개 시나리오, 통과 확인됨 2026-07-17)
+Tests: `python test_optimize.py` (three scenarios).
 
-## 요청 예시
+During local development, `AUTH_DISABLED=1` skips token checks. Never set it in a deployed
+environment.
+
+## Example request
 
 ```json
 POST /optimize
@@ -31,26 +37,35 @@ POST /optimize
 }
 ```
 
-응답: 차량별 방문 순서(seq)·ETA·적재량, 이월된 지점(dropped_report_ids),
-총 거리/시간. 앱(관리자 화면)은 이 결과를 collection_jobs / job_stops에 저장.
+The response carries, per vehicle, the visit order (`seq`), ETAs and load, plus the stops that
+were carried over (`dropped_report_ids`) and the total distance and time. The admin screens in
+the app save this into `collection_jobs` and `job_stops`.
 
-## 지원 제약 (기획안 5장)
+## Constraints supported
 
-차량 수/적재량, 작업 가능 시간, 지점별 작업시간, 우선순위(이월 방지 가중),
-필수 수거 지점(required), 출발지/복귀지 분리. 대형 지점 방문 분할과
-용량 초과분 이월은 자동 처리(PoC 교훈).
+Vehicle count and capacity, available working time, per-stop service time, priority (weighted
+so urgent stops are not endlessly deferred), mandatory stops (`required`), and separate start
+and return points. Splitting oversized stops across visits and carrying the excess over to the
+next run are both automatic — two lessons taken straight from the proof of concept.
 
-## 배포 (Cloud Run 예시)
+## Deploying (Cloud Run)
 
 ```bash
-gcloud run deploy bikereclaim-optimizer --source . --region asia-northeast3 \
+gcloud run deploy bikeloop-optimizer --source . --region asia-northeast3 \
   --allow-unauthenticated
 ```
 
-Railway/Fly는 Dockerfile 자동 인식. 비밀키 없음(현재 버전은 키가 필요 없다 —
-BE-05에서 카카오 길찾기 행렬 붙일 때만 KAKAO_REST_KEY 환경변수 추가).
+`--allow-unauthenticated` refers to Cloud Run's own IAM layer only: the application itself
+still rejects anonymous callers. Every endpoint except `/health` requires a valid Supabase
+access token, verified in `auth.py` and rate-limited per user. Railway and Fly detect the
+Dockerfile automatically.
 
-## 한계 / 다음 단계
+Environment variables (see `.env.example`): `KAKAO_REST_KEY`, `KAKAO_MOBILITY_KEY`,
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, plus the optional `RATE_LIMIT_PER_MIN`,
+`AUTH_CACHE_SECONDS` and the `OPT_*` tuning values. None of these are committed.
 
-- 거리·시간이 하버사인 직선 근사 → BE-05에서 카카오 자동차 길찾기 행렬로 교체
-- 인증 없음(MVP) → 배포 후엔 앱에서만 아는 간단한 토큰 헤더 추가 권장
+## Limitations and next steps
+
+- Distances and times inside the solver are still haversine approximations; Kakao's car
+  routing matrix is used for display but not yet fed back into the optimizer.
+- Multi-vehicle routing is implemented but has not been exercised in the field.

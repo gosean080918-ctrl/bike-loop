@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../const/value/app_theme.dart';
 import '../../state_management/providers.dart';
 
-/// AUTH-02: 이메일 로그인/회원가입 (Supabase Auth)
+/// AUTH-02: email sign-in and sign-up (Supabase Auth)
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
 
@@ -55,7 +55,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 브랜드 헤더 (BIKE LOOP 로고 + 워드마크)
+                  // Brand header: BIKE LOOP logo and wordmark
                   Center(
                     child: Image.asset('assets/logo.png',
                         width: 110, height: 110),

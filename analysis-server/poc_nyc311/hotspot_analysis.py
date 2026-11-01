@@ -1,9 +1,9 @@
 """
-PoC 1 — 핫스팟 분석: NYC 311 'Derelict Bicycle' (2020-01 ~ 2021-09, n=2,743)
-방법: ~111m 그리드 셀 집계 데이터에 대해
-  (a) KDE(가우시안 커널 밀도) 히트맵
-  (b) Getis-Ord Gi* (KNN 공간가중, 유의 핫스팟 z>1.96 / z>2.58)
-출력: kde_heatmap.png, gistar_map.png, hotspots_top.csv
+PoC 1 — hotspot analysis of NYC 311 'Derelict Bicycle' reports (2020-01 to 2021-09, n=2,743)
+Method: on counts aggregated into roughly 111 m grid cells,
+  (a) a KDE (Gaussian kernel density) heatmap
+  (b) Getis-Ord Gi* with KNN spatial weights; significant hotspots at z > 1.96 and z > 2.58
+Outputs: kde_heatmap.png, gistar_map.png, hotspots_top.csv
 """
 import numpy as np
 import pandas as pd
@@ -15,9 +15,9 @@ from libpysal.weights import KNN
 from esda.getisord import G_Local
 
 df = pd.read_csv("grid.csv")
-df["lat"] = df["a"] / 1000 + 0.0005   # 셀 중심
+df["lat"] = df["a"] / 1000 + 0.0005   # cell centre
 df["lng"] = df["b"] / 1000 + 0.0005
-# 외곽 이상치(스태튼섬 끝 등) 제거 없이 전체 사용
+# Everything is used; no outliers are trimmed, not even far-flung ones such as the tip of Staten Island
 coords = df[["lng", "lat"]].to_numpy()
 n = df["n"].to_numpy(dtype=float)
 print(f"cells={len(df)}, reports={int(n.sum())}")

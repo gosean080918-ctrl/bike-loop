@@ -9,8 +9,8 @@ import '../../const/value/app_theme.dart';
 import '../../const/value/constants.dart';
 import '../../state_management/providers.dart';
 
-/// RPT-05: 카카오맵에 활성 신고 표시
-/// 마커는 동선 지도에서 검증된 패턴(onMapCreated 후 setState 주입)을 사용.
+/// RPT-05: show active reports on the Kakao map
+/// Markers use the pattern proven on the route map: inject them with setState after onMapCreated.
 class MapTab extends ConsumerStatefulWidget {
   const MapTab({super.key});
 
@@ -28,21 +28,21 @@ class _MapTabState extends ConsumerState<MapTab> {
   @override
   void initState() {
     super.initState();
-    // 전국 서비스(2026-08-12): 지도는 전국 뷰로 열되, 내 위치를 얻으면
-    // 신고자 동네로 이동한다. 지도는 재생성하지 않고 컨트롤러로만 옮긴다.
+    // Nationwide (2026-08-12): open on the national view, then move to the user's
+    // neighbourhood once a position arrives — via the controller, without rebuilding the map.
     WidgetsBinding.instance.addPostFrameCallback((_) => _moveToMe());
   }
 
-  /// 내 위치로 이동.
-  /// [manual]이면 사용자가 버튼을 눌러 요청한 것 → 실패 시 안내를 띄운다.
+  /// Move to the user's position.
+  /// When [manual], the user pressed the button, so failures are reported on screen.
   ///
-  /// ⚠ 지도(WebView)가 준비되기 전에 setCenter를 호출하면 조용히 무시된다.
-  ///   그래서 컨트롤러가 생길 때까지 짧게 재시도한다.
+  /// NOTE: calling setCenter before the map's WebView is ready is silently ignored,
+  ///   so this retries briefly until the controller exists.
   Future<void> _moveToMe({bool manual = false}) async {
     if (_movedToMe && !manual) return;
     final svc = ref.read(locationServiceProvider);
 
-    // 마지막으로 알던 위치가 있으면 먼저 옮겨 체감 속도를 높인다
+    // If a last known position exists, move there first so the app feels faster
     final last = await svc.getLastKnownPosition();
     if (mounted && last != null && isInKorea(last.latitude, last.longitude)) {
       await _center(last.latitude, last.longitude);
@@ -62,11 +62,11 @@ class _MapTabState extends ConsumerState<MapTab> {
     _movedToMe = true;
   }
 
-  /// 컨트롤러가 준비될 때까지 최대 3초간 재시도하며 중심 이동
+  /// Retry centring for up to three seconds, until the controller is ready
   ///
-  /// ⚠ 카카오맵은 WebView 안에서 돌아간다. 지도 내부 초기화가 끝나기 전에
-  ///   setCenter/setLevel을 호출하면 지도가 흰 화면이 되는 사례가 있어,
-  ///   위치 선택 화면과 동일하게 relayout()을 먼저 부르고 이동시킨다.
+  /// NOTE: Kakao Maps runs inside a WebView. Calling setCenter or setLevel before its
+  ///   internal initialization finishes has been seen to leave the map blank, so — as on
+  ///   the location picker — relayout() is called first, then the move.
   Future<void> _center(double lat, double lng) async {
     for (var i = 0; i < 10; i++) {
       if (!mounted) return;
@@ -78,7 +78,7 @@ class _MapTabState extends ConsumerState<MapTab> {
           _controller!.setCenter(LatLng(lat, lng));
           _controller!.setLevel(kNearMapLevel);
         } catch (_) {
-          // 지도가 아직 준비 안 됐으면 다음 루프에서 재시도
+          // Not ready yet: retry on the next loop
           await Future.delayed(const Duration(milliseconds: 300));
           continue;
         }
@@ -88,13 +88,13 @@ class _MapTabState extends ConsumerState<MapTab> {
     }
   }
 
-  /// 유형별 핀 색 (범례와 공유)
+  /// Pin colour per condition type, shared with the legend
   static const Map<String, Color> kConditionColors = {
-    'long_term': Color(0xFF1B7742), // 장기방치 의심 — 초록
-    'damaged': Color(0xFFE8590C), // 파손 — 오렌지
-    'obstruction': Color(0xFFE24B4A), // 통행 방해 — 빨강
-    'parts_missing': Color(0xFF1B5FA5), // 부품 분실 — 파랑
-    'other': Color(0xFF6B7671), // 기타 — 회색
+    'long_term': Color(0xFF1B7742), // suspected long-abandoned — green
+    'damaged': Color(0xFFE8590C), // damaged — orange
+    'obstruction': Color(0xFFE24B4A), // blocking a footpath — red
+    'parts_missing': Color(0xFF1B5FA5), // parts missing — blue
+    'other': Color(0xFF6B7671), // other — grey
   };
 
   static String _hex(Color c) =>
@@ -102,7 +102,7 @@ class _MapTabState extends ConsumerState<MapTab> {
 
   static final Map<String, String> _pinCache = {};
 
-  /// 유형별 원형 핀 (SVG 데이터 URI, 캐시)
+  /// Round pin per type, as a cached SVG data URI
   static String _pinFor(String condition) =>
       _pinCache.putIfAbsent(condition, () {
         final color =
@@ -137,7 +137,7 @@ class _MapTabState extends ConsumerState<MapTab> {
   Widget build(BuildContext context) {
     final reports = ref.watch(activeReportsProvider);
 
-    // 데이터가 바뀌면 마커 갱신
+    // Refresh the markers when the data changes
     ref.listen(activeReportsProvider, (_, next) {
       final list = next.value;
       if (list != null) _rebuildMarkers(list);
@@ -153,10 +153,10 @@ class _MapTabState extends ConsumerState<MapTab> {
             onMapCreated: (c) {
               _mapReady = true;
               _controller = c;
-              // ★ 지도 빈 화면 방지 — GPS 성공 여부와 무관하게 무조건 실행한다.
-              //   WebView가 레이아웃을 잡기 전에 생성되면 타일이 안 그려지는데,
-              //   relayout() + setCenter()를 한 번 불러주면 복구된다.
-              //   (위치 선택 화면에서 검증된 패턴)
+              // Blank-map guard: runs unconditionally, whether or not GPS succeeded.
+              //   If the WebView is created before it has a layout, no tiles are drawn;
+              //   calling relayout() and setCenter() once recovers it.
+              //   (the same pattern already proven on the location picker)
               Future.delayed(const Duration(milliseconds: 600), () {
                 if (!mounted) return;
                 try {
@@ -168,7 +168,7 @@ class _MapTabState extends ConsumerState<MapTab> {
                 if (list != null) _rebuildMarkers(list);
                 _moveToMe();
               });
-              // 느린 기기 대비 2차 보정
+              // A second pass, for slower devices
               Future.delayed(const Duration(milliseconds: 1800), () {
                 if (!mounted) return;
                 try {
@@ -217,7 +217,7 @@ class _MapTabState extends ConsumerState<MapTab> {
                 tooltip: 'Refresh',
                 icon: const Icon(Icons.refresh),
                 onPressed: () {
-                  // 지도가 비어 보일 때의 수동 복구 수단도 겸한다
+                  // Doubles as a manual recovery when the map looks blank
                   try {
                     _controller?.relayout();
                   } catch (_) {}
@@ -225,7 +225,7 @@ class _MapTabState extends ConsumerState<MapTab> {
                 },
               ),
               const SizedBox(height: 8),
-              // 내 위치로 이동 — 자동 이동이 실패했을 때의 수동 수단
+              // Move to my location — the manual fallback when the automatic move fails
               IconButton.filledTonal(
                 tooltip: 'My location',
                 icon: const Icon(Icons.my_location),
@@ -234,7 +234,7 @@ class _MapTabState extends ConsumerState<MapTab> {
             ],
           ),
         ),
-        // 유형별 색 범례
+        // Colour legend by type
         Positioned(
           left: 12,
           bottom: 16,
