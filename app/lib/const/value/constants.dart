@@ -11,9 +11,12 @@ const String kSupabaseUrl = 'https://xpkifseyiphyvoppcsui.supabase.co';
 /// Publishable key (anon 역할, RLS 전제 — 앱에 포함 가능)
 const String kSupabaseAnonKey = 'sb_publishable_JNTxRVuSMHQV1-aoL7tOLg_gc6e8Cn-';
 
-/// 카카오맵 JavaScript 키 (앱: BikeReclaim, ID 1514725)
-/// ※ 카카오 콘솔에서 Web 플랫폼(http://localhost) 등록 + 카카오맵 활성화 필요
-const String kKakaoJsKey = '69c16e042a28b0f92bdd91e61421c3cc';
+/// 카카오맵 JavaScript 키 (앱: Bike Loop, ID 1622635 — 2026-10-26 교체)
+/// ※ 이전 앱(BikeReclaim, ID 1514725)이 콘솔에서 사라져 키가 무효가 되는 바람에
+///   모든 화면에서 지도가 빈 화면이 됐다. 새 앱을 만들어 키를 교체함.
+/// ※ 콘솔 조건: 앱>플랫폼 키>JS 키에 도메인(http://localhost) 등록 +
+///   제품 설정>카카오맵 사용 ON
+const String kKakaoJsKey = 'f143629fbc328db1b57a03365760a430';
 
 /// 사진 버킷 이름
 const String kPhotoBucket = 'report-photos';

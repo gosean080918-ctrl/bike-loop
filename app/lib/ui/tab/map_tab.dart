@@ -65,9 +65,17 @@ class _MapTabState extends ConsumerState<MapTab> {
   Future<void> _center(double lat, double lng) async {
     for (var i = 0; i < 10; i++) {
       if (!mounted) return;
-      if (_controller != null) {
-        _controller!.setCenter(LatLng(lat, lng));
-        _controller!.setLevel(kNearMapLevel);
+      if (_mapReady && _controller != null) {
+        try {
+          _controller!.relayout();
+          await Future.delayed(const Duration(milliseconds: 150));
+          if (!mounted || _controller == null) return;
+          _controller!.setCenter(LatLng(lat, lng));
+          _controller!.setLevel(kNearMapLevel);
+        } catch (_) {
+          await Future.delayed(const Duration(milliseconds: 300));
+          continue;
+        }
         return;
       }
       await Future.delayed(const Duration(milliseconds: 300));
@@ -139,11 +147,27 @@ class _MapTabState extends ConsumerState<MapTab> {
             onMapCreated: (c) {
               _mapReady = true;
               _controller = c;
-              // 지도 준비 후 현재 데이터로 마커 주입 + 내 위치로 이동
-              Future.delayed(const Duration(milliseconds: 400), () {
+              // ★ 지도 빈 화면 방지 — GPS 성공 여부와 무관하게 무조건 실행.
+              //   WebView가 레이아웃을 잡기 전에 생성되면 타일이 안 그려지는데
+              //   relayout() + setCenter()를 한 번 불러주면 복구된다.
+              //   (위치 선택 화면에서 검증된 패턴)
+              Future.delayed(const Duration(milliseconds: 600), () {
+                if (!mounted) return;
+                try {
+                  c.relayout();
+                  c.setCenter(LatLng(kDefaultLat, kDefaultLng));
+                  c.setLevel(kDefaultMapLevel);
+                } catch (_) {}
                 final list = ref.read(activeReportsProvider).value;
                 if (list != null) _rebuildMarkers(list);
                 _moveToMe();
+              });
+              // 느린 기기 대비 2차 보정
+              Future.delayed(const Duration(milliseconds: 1800), () {
+                if (!mounted) return;
+                try {
+                  c.relayout();
+                } catch (_) {}
               });
             },
           ),
@@ -186,7 +210,13 @@ class _MapTabState extends ConsumerState<MapTab> {
               IconButton.filledTonal(
                 tooltip: '새로고침',
                 icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(activeReportsProvider),
+                onPressed: () {
+                  // 지도가 비어 보일 때의 수동 복구 수단도 겸한다
+                  try {
+                    _controller?.relayout();
+                  } catch (_) {}
+                  ref.invalidate(activeReportsProvider);
+                },
               ),
               const SizedBox(height: 8),
               // 내 위치로 이동 — 자동 이동이 실패했을 때의 수동 수단
