@@ -4,7 +4,7 @@ This is the project's single source of truth. It records what was built, what wa
 why, and what broke along the way. Read this file and you should be able to pick the project up
 without reading anything else.
 
-Maintained by 한정규 (Jeong-Kyu Han).
+Maintained by Gosean.
 
 ---
 

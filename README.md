@@ -202,10 +202,10 @@ accounts.
 
 ## Credits
 
-Built by **한정규 (Jeong-Kyu Han)**. Optimization engine adapted from a framework by
+Built by **Gosean**. Optimization engine adapted from a framework by
 **이강혁 (Kang-Hyuk Lee)**, used with permission.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Brand assets (the BIKE LOOP name and logo) and operational data are
-not covered by the licence.
+MIT — see [LICENSE](LICENSE), which also records the attribution for the optimization engine.
+Brand assets (the BIKE LOOP name and logo) and operational data are not covered by the licence.

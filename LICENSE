@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 한정규 (Jeong-Kyu Han), 이강혁 (Kang-Hyuk Lee)
+Copyright (c) 2026 Gosean, 이강혁 (Kang-Hyuk Lee)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,14 +22,14 @@ SOFTWARE.
 
 ---
 
-BIKE LOOP — 방치 자전거 신고·수거 최적화 서비스
+BIKE LOOP — reporting and collection-route optimization for abandoned bicycles
 
-이 저장소의 코드는 위 MIT 라이선스로 공개됩니다.
-다만 아래는 라이선스 대상이 아닙니다.
+The code in this repository is released under the MIT licence above. The following are
+not covered by it:
 
-- BIKE LOOP 이름과 로고 등 브랜드 요소
-- 앱 화면 스크린샷에 담긴 신고 사진 등 운영 데이터
-- 카카오·Supabase·Google Cloud 등 외부 서비스의 상표와 데이터
+- Brand elements, including the BIKE LOOP name and logo
+- Operational data, such as the report photographs visible in screenshots
+- Trademarks and data belonging to third-party services (Kakao, Supabase, Google Cloud)
 
-경로 최적화 엔진(server/engine.py)은 이강혁의 최적화 프레임워크를
-서버용으로 이식한 것이며, 공개에 대한 동의를 받았습니다.
+Attribution: the route optimization engine (server/engine.py) is a server-side port of an
+optimization framework by 이강혁 (Kang-Hyuk Lee), used and published with permission.
