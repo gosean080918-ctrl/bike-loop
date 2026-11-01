@@ -20,7 +20,7 @@ class MyReportsTab extends ConsumerWidget {
       onRefresh: () async => ref.invalidate(myReportsProvider),
       child: reports.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('오류: $e')),
+        error: (e, _) => Center(child: Text('Error: $e')),
         data: (list) {
           final done =
               list.where((r) => r.status == 'collected').length;
@@ -28,14 +28,14 @@ class MyReportsTab extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
             children: [
               // 시안 헤더: 큰 제목 + 요약
-              const Text('내 신고',
+              const Text('My Reports',
                   style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.5,
                       color: AppColors.ink)),
               const SizedBox(height: 4),
-              Text('총 ${list.length}건 · 수거 완료 $done건',
+              Text('${list.length} total · $done collected',
                   style: const TextStyle(
                       fontSize: 14, color: AppColors.muted)),
               const SizedBox(height: 16),
@@ -44,7 +44,7 @@ class MyReportsTab extends ConsumerWidget {
                 const Padding(
                   padding: EdgeInsets.only(top: 100),
                   child: Center(
-                      child: Text('아직 신고 내역이 없습니다.',
+                      child: Text('No reports yet.',
                           style: TextStyle(color: AppColors.muted))),
                 ),
 

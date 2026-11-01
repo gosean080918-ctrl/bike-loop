@@ -53,7 +53,8 @@ class _MapTabState extends ConsumerState<MapTab> {
     if (pos == null || !isInKorea(pos.latitude, pos.longitude)) {
       if (manual) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('현재 위치를 확인할 수 없습니다. 위치 권한과 GPS를 확인해주세요')));
+            content: Text(
+                'Could not get your location. Check location permission and GPS.')));
       }
       return;
     }
@@ -62,12 +63,25 @@ class _MapTabState extends ConsumerState<MapTab> {
   }
 
   /// 컨트롤러가 준비될 때까지 최대 3초간 재시도하며 중심 이동
+  ///
+  /// ⚠ 카카오맵은 WebView 안에서 돌아간다. 지도 내부 초기화가 끝나기 전에
+  ///   setCenter/setLevel을 호출하면 지도가 흰 화면이 되는 사례가 있어,
+  ///   위치 선택 화면과 동일하게 relayout()을 먼저 부르고 이동시킨다.
   Future<void> _center(double lat, double lng) async {
     for (var i = 0; i < 10; i++) {
       if (!mounted) return;
-      if (_controller != null) {
-        _controller!.setCenter(LatLng(lat, lng));
-        _controller!.setLevel(kNearMapLevel);
+      if (_mapReady && _controller != null) {
+        try {
+          _controller!.relayout();
+          await Future.delayed(const Duration(milliseconds: 150));
+          if (!mounted || _controller == null) return;
+          _controller!.setCenter(LatLng(lat, lng));
+          _controller!.setLevel(kNearMapLevel);
+        } catch (_) {
+          // 지도가 아직 준비 안 됐으면 다음 루프에서 재시도
+          await Future.delayed(const Duration(milliseconds: 300));
+          continue;
+        }
         return;
       }
       await Future.delayed(const Duration(milliseconds: 300));
@@ -139,11 +153,27 @@ class _MapTabState extends ConsumerState<MapTab> {
             onMapCreated: (c) {
               _mapReady = true;
               _controller = c;
-              // 지도 준비 후 현재 데이터로 마커 주입 + 내 위치로 이동
-              Future.delayed(const Duration(milliseconds: 400), () {
+              // ★ 지도 빈 화면 방지 — GPS 성공 여부와 무관하게 무조건 실행한다.
+              //   WebView가 레이아웃을 잡기 전에 생성되면 타일이 안 그려지는데,
+              //   relayout() + setCenter()를 한 번 불러주면 복구된다.
+              //   (위치 선택 화면에서 검증된 패턴)
+              Future.delayed(const Duration(milliseconds: 600), () {
+                if (!mounted) return;
+                try {
+                  c.relayout();
+                  c.setCenter(LatLng(kDefaultLat, kDefaultLng));
+                  c.setLevel(kDefaultMapLevel);
+                } catch (_) {}
                 final list = ref.read(activeReportsProvider).value;
                 if (list != null) _rebuildMarkers(list);
                 _moveToMe();
+              });
+              // 느린 기기 대비 2차 보정
+              Future.delayed(const Duration(milliseconds: 1800), () {
+                if (!mounted) return;
+                try {
+                  c.relayout();
+                } catch (_) {}
               });
             },
           ),
@@ -165,15 +195,15 @@ class _MapTabState extends ConsumerState<MapTab> {
               ],
             ),
             child: reports.when(
-              data: (list) => Text('처리 중 신고 ${list.length}건',
+              data: (list) => Text('${list.length} open reports',
                   style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.ink)),
-              loading: () => const Text('불러오는 중...',
+              loading: () => const Text('Loading…',
                   style:
                       TextStyle(fontSize: 13, color: AppColors.muted)),
-              error: (e, _) => Text('오류: $e',
+              error: (e, _) => Text('Error: $e',
                   style: const TextStyle(fontSize: 13)),
             ),
           ),
@@ -184,14 +214,20 @@ class _MapTabState extends ConsumerState<MapTab> {
           child: Column(
             children: [
               IconButton.filledTonal(
-                tooltip: '새로고침',
+                tooltip: 'Refresh',
                 icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(activeReportsProvider),
+                onPressed: () {
+                  // 지도가 비어 보일 때의 수동 복구 수단도 겸한다
+                  try {
+                    _controller?.relayout();
+                  } catch (_) {}
+                  ref.invalidate(activeReportsProvider);
+                },
               ),
               const SizedBox(height: 8),
               // 내 위치로 이동 — 자동 이동이 실패했을 때의 수동 수단
               IconButton.filledTonal(
-                tooltip: '내 위치',
+                tooltip: 'My location',
                 icon: const Icon(Icons.my_location),
                 onPressed: () => _moveToMe(manual: true),
               ),

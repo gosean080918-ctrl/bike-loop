@@ -8,6 +8,7 @@ import '../../const/value/app_theme.dart';
 import '../../const/value/constants.dart';
 import '../../const/value/regions.dart';
 import '../../state_management/providers.dart';
+import '../../utils/romanize.dart';
 import '../route/location_picker_screen.dart';
 
 /// RPT-01~04: 사진 → 현재 위치 자동 + 지도 조정 → 상태 유형(5종)+설명 → 중복 확인 → 제출
@@ -53,7 +54,8 @@ class _ReportTabState extends ConsumerState<ReportTab> {
       if (pos == null || !isInKorea(pos.latitude, pos.longitude)) {
         if (mounted && force) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('현재 위치를 확인할 수 없습니다. 지도에서 직접 선택해주세요')));
+              content: Text(
+                  'Could not get your location. Please pick it on the map.')));
         }
         return;
       }
@@ -114,7 +116,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
     // 서비스 지역(대한민국) 밖 신고 불가
     if (!isInKorea(_lat!, _lng!)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('$kOutOfServiceMsg — 지도에서 국내 위치로 수정해주세요')));
+          content: Text('$kOutOfServiceMsg — please pick a location in Korea')));
       return;
     }
     setState(() => _busy = true);
@@ -126,17 +128,18 @@ class _ReportTabState extends ConsumerState<ReportTab> {
         final proceed = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('근처에 이미 신고가 있어요'),
-            content: Text('${nearby.first.distanceM.round()}m 거리에 '
-                '처리 중인 신고 ${nearby.length}건이 있습니다.\n'
-                '같은 자전거라면 중복 신고가 될 수 있어요. 계속할까요?'),
+            title: const Text('Already reported nearby'),
+            content: Text(
+                '${nearby.length} open report(s) exist within '
+                '${nearby.first.distanceM.round()}m.\n'
+                'If it is the same bicycle this would be a duplicate. Continue?'),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('취소')),
+                  child: const Text('Cancel')),
               FilledButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('계속 신고')),
+                  child: const Text('Report anyway')),
             ],
           ),
         );
@@ -160,7 +163,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
       ref.invalidate(pendingReportsProvider); // 관리자 검토 탭 갱신
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('신고가 접수되었습니다. 감사합니다!')));
+            const SnackBar(content: Text('Report submitted. Thank you!')));
         setState(() {
           _photo = null;
           _lat = null;
@@ -175,7 +178,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('제출 실패: $e')));
+            .showSnackBar(SnackBar(content: Text('Submit failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -193,7 +196,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // 1. 사진 (RPT-01) — 시안: 대시 보더 타일 + 미리보기
-          const SectionTitle('사진', required: true),
+          const SectionTitle('Photo', required: true),
           const SizedBox(height: 10),
           _photo == null
               ? Row(
@@ -217,7 +220,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
                                     fontSize: 24,
                                     color: AppColors.primary,
                                     fontWeight: FontWeight.w300)),
-                            Text('촬영',
+                            Text('Camera',
                                 style: TextStyle(
                                     fontSize: 12, color: AppColors.muted)),
                           ],
@@ -242,7 +245,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
                             Icon(Icons.photo_library_outlined,
                                 size: 22, color: AppColors.primary),
                             SizedBox(height: 4),
-                            Text('갤러리',
+                            Text('Gallery',
                                 style: TextStyle(
                                     fontSize: 12, color: AppColors.muted)),
                           ],
@@ -266,7 +269,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
                   child: OutlinedButton.icon(
                     onPressed: () => _takePhoto(ImageSource.camera),
                     icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                    label: const Text('다시 촬영'),
+                    label: const Text('Retake'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -274,7 +277,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
                   child: OutlinedButton.icon(
                     onPressed: () => _takePhoto(ImageSource.gallery),
                     icon: const Icon(Icons.photo_library_outlined, size: 18),
-                    label: const Text('갤러리'),
+                    label: const Text('Gallery'),
                   ),
                 ),
               ],
@@ -283,7 +286,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
           const SizedBox(height: 22),
 
           // 2. 위치 (시안: 흰 카드 + 초록 점 + '수정' 링크)
-          const SectionTitle('위치'),
+          const SectionTitle('Location'),
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(
@@ -321,11 +324,12 @@ class _ReportTabState extends ConsumerState<ReportTab> {
                     Expanded(
                       child: Text(
                         _locating && _lat == null
-                            ? '현재 위치를 확인하는 중…'
+                            ? 'Getting your location…'
                             : _lat == null
-                                ? '지도에서 자전거 위치를 선택해주세요'
-                                : (_address ??
-                                    '${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}'),
+                                ? 'Pick the bicycle location on the map'
+                                : (_address == null
+                                    ? '${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}'
+                                    : romanizeAddress(_address)),
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
@@ -339,7 +343,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
                     const SizedBox(width: 8),
                     GestureDetector(
                       onTap: _adjustLocation,
-                      child: Text(_lat == null ? '위치 선택' : '수정',
+                      child: Text(_lat == null ? 'Select' : 'Edit',
                           style: const TextStyle(
                               fontSize: 13.5,
                               fontWeight: FontWeight.w600,
@@ -359,7 +363,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
                           color: AppColors.primarySoft,
                           borderRadius: BorderRadius.circular(100),
                         ),
-                        child: Text(regionOf(_address)!,
+                        child: Text(romanizeRegion(regionOf(_address)),
                             style: const TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w700,
@@ -369,7 +373,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
                     TextButton.icon(
                       onPressed: _locating ? null : () => _locateMe(force: true),
                       icon: const Icon(Icons.my_location, size: 15),
-                      label: const Text('내 위치로'),
+                      label: const Text('My location'),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         minimumSize: const Size(0, 30),
@@ -384,7 +388,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
           const SizedBox(height: 22),
 
           // 3. 상태 유형 선택 (RPT-03, 기획안 5종)
-          const SectionTitle('자전거 상태', required: true),
+          const SectionTitle('Condition', required: true),
           const SizedBox(height: 4),
           Wrap(
             spacing: 8,
@@ -400,14 +404,16 @@ class _ReportTabState extends ConsumerState<ReportTab> {
           const SizedBox(height: 12),
 
           // 4. 간단한 설명 (RPT-03)
-          const SectionTitle('설명', hint: '(선택)'),
+          const SectionTitle('Description', hint: '(optional)'),
           const SizedBox(height: 10),
           TextField(
             controller: _description,
             maxLines: 4,
             maxLength: 300,
             decoration: const InputDecoration(
-              hintText: '예: 바퀴에 녹이 슬어 있고 안장이 없어요. 한 달 넘게 같은 자리에 있는 것 같아요.',
+              hintText:
+                  'e.g. The wheels are rusted and the saddle is gone. '
+                  'It has been in the same spot for over a month.',
             ),
           ),
           const SizedBox(height: 14),
@@ -433,7 +439,7 @@ class _ReportTabState extends ConsumerState<ReportTab> {
                       height: 22,
                       child: CircularProgressIndicator(
                           strokeWidth: 2.4, color: Colors.white))
-                  : const Text('신고 접수하기'),
+                  : const Text('Submit report'),
             ),
           ),
         ],

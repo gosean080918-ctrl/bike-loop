@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../const/model/report.dart';
 import '../../const/value/constants.dart';
 import '../../state_management/providers.dart';
+import '../../utils/romanize.dart';
 import '../component/signed_photo.dart';
 import '../route/report_detail_screen.dart';
 
@@ -26,7 +27,7 @@ class AdminReviewTab extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('실패: $e')));
+            .showSnackBar(SnackBar(content: Text('Failed: $e')));
       }
     }
   }
@@ -38,13 +39,13 @@ class AdminReviewTab extends ConsumerWidget {
     if (!context.mounted) return;
     if (candidates.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('50m 내 다른 신고가 없습니다. 반려로 처리하거나 승인하세요.')));
+          content: Text('No other report within 50m. Approve or reject instead.')));
       return;
     }
     final chosen = await showDialog<NearbyReport>(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: const Text('원본 신고 선택 (중복 처리)'),
+        title: const Text('Pick the original report'),
         children: candidates
             .map((c) => SimpleDialogOption(
                   onPressed: () => Navigator.pop(ctx, c),
@@ -56,7 +57,7 @@ class AdminReviewTab extends ConsumerWidget {
     );
     if (chosen != null && context.mounted) {
       await _act(context, ref, admin.markDuplicate(r.id, chosen.id),
-          '중복 처리 완료');
+          'Marked as duplicate');
     }
   }
 
@@ -74,9 +75,9 @@ class AdminReviewTab extends ConsumerWidget {
     final admin = ref.read(adminServiceProvider);
     switch (action) {
       case 'approve':
-        await _act(context, ref, admin.approve(r.id), '승인 완료');
+        await _act(context, ref, admin.approve(r.id), 'Approved');
       case 'reject':
-        await _act(context, ref, admin.reject(r.id), '반려 처리');
+        await _act(context, ref, admin.reject(r.id), 'Rejected');
       case 'duplicate':
         await _duplicate(context, ref, r);
     }
@@ -92,12 +93,12 @@ class AdminReviewTab extends ConsumerWidget {
       onRefresh: () async => ref.invalidate(pendingReportsProvider),
       child: pending.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('오류: $e')),
+        error: (e, _) => Center(child: Text('Error: $e')),
         data: (list) {
           if (list.isEmpty) {
             return ListView(children: const [
               SizedBox(height: 120),
-              Center(child: Text('검토 대기 중인 신고가 없습니다.')),
+              Center(child: Text('No reports waiting for review.')),
             ]);
           }
           return ListView.separated(
@@ -137,8 +138,9 @@ class AdminReviewTab extends ConsumerWidget {
                                           fontSize: 12,
                                           color: Colors.grey)),
                                   Text(
-                                      r.address ??
-                                          '${r.lat.toStringAsFixed(5)}, ${r.lng.toStringAsFixed(5)}',
+                                      r.address == null
+                                          ? '${r.lat.toStringAsFixed(5)}, ${r.lng.toStringAsFixed(5)}'
+                                          : romanizeAddress(r.address),
                                       style:
                                           const TextStyle(fontSize: 12)),
                                   if (r.description.isNotEmpty)
@@ -168,23 +170,23 @@ class AdminReviewTab extends ConsumerWidget {
                           Expanded(
                             child: FilledButton.tonal(
                               onPressed: () => _act(context, ref,
-                                  admin.approve(r.id), '승인 완료'),
-                              child: const Text('승인'),
+                                  admin.approve(r.id), 'Approved'),
+                              child: const Text('Approve'),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: OutlinedButton(
                               onPressed: () => _act(context, ref,
-                                  admin.reject(r.id), '반려 처리'),
-                              child: const Text('반려'),
+                                  admin.reject(r.id), 'Rejected'),
+                              child: const Text('Reject'),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: OutlinedButton(
                               onPressed: () => _duplicate(context, ref, r),
-                              child: const Text('중복'),
+                              child: const Text('Duplicate'),
                             ),
                           ),
                         ],

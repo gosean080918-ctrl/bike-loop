@@ -1,7 +1,44 @@
 # BIKE LOOP
 
+> **🇰🇷 Service area: South Korea only.**
+> BIKE LOOP is built for Korean local governments and runs **nationwide within South Korea**.
+> It does not work outside the country, and this is a deliberate design decision rather than
+> an unfinished feature.
+>
+> **Why:** Korean law restricts the export of national map data, so Google Maps cannot provide
+> car navigation inside South Korea. Every geospatial feature here — map tiles, address lookup,
+> place search and road routing — therefore runs on **Kakao**, whose coverage ends at the border.
+> The app blocks out-of-country coordinates on purpose (`isInKorea()`), because Kakao returns
+> blank tiles there.
+>
+> Supporting other countries would mean running a second provider (e.g. Google Maps) in parallel
+> and keeping both stacks alive, since Kakao remains mandatory for routing inside Korea.
+> That is out of scope for this project.
+
+> **🔑 About the API keys you can see in this repository.**
+> The keys visible in `app/lib/const/value/constants.dart` are **client-side keys that are meant
+> to be public** — a Kakao JavaScript key and a Supabase *publishable* (anon) key. They ship
+> inside every installed app, so hiding them in the source would achieve nothing. They are
+> protected by configuration instead: the Kakao key only works from registered domains, and
+> Supabase access is enforced by Row Level Security in the database, not by key secrecy.
+>
+> **The keys that actually matter are not here and never were** — not in the working tree and
+> not in the commit history:
+>
+> | Key | Where it lives | Risk if leaked |
+> |---|---|---|
+> | Kakao **REST** key | server `.env` only (git-ignored) | billed API quota abuse |
+> | Supabase `service_role` | not used at all | full database access |
+>
+> The optimization server also refuses unauthenticated calls: it verifies the caller's Supabase
+> access token and rate-limits per user (`server/auth.py`), so knowing the server URL is not
+> enough to spend our Kakao quota. See `server/.env.example` for the variables you need to run
+> your own instance.
+
 방치된 자전거를 **신고 → 검토 → 최적 수거경로 생성 → 수거 → 재고관리 → 통계**까지
 한 흐름으로 처리하는 앱입니다. 전국(대한민국) 서비스.
+
+*(This README is written in Korean. The notice above summarises the service area in English.)*
 
 > **LOOP의 두 가지 뜻**
 > ① 차량이 보관소를 출발해 여러 지점을 돌고 돌아오는 **순환 경로**

@@ -62,7 +62,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         timeout: const Duration(seconds: 6),
       );
       if (res.statusCode == 401) throw Exception(ApiClient.authErrorMessage);
-      if (res.statusCode != 200) throw Exception('검색 실패');
+      if (res.statusCode != 200) throw Exception('Search failed');
       final places = (jsonDecode(res.body)['places'] as List)
           .map((p) => _Place(
                 p['name'] as String? ?? '',
@@ -74,12 +74,12 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       if (mounted) setState(() => _results = places);
       if (places.isEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('검색 결과가 없습니다')));
+            const SnackBar(content: Text('No results')));
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('검색 실패 — 서버가 켜져 있는지 확인하세요')));
+            content: Text('Search failed — check that the server is running')));
       }
     } finally {
       if (mounted) setState(() => _searching = false);
@@ -124,7 +124,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('신고 위치 조정')),
+      appBar: AppBar(title: const Text('Adjust location')),
       body: Stack(
         children: [
           // 지도를 화면 전체에 강제 배치 (크기 미지정으로 인한 빈 화면 방지)
@@ -184,7 +184,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                           textInputAction: TextInputAction.search,
                           onSubmitted: (_) => _search(),
                           decoration: const InputDecoration(
-                            hintText: '동네 이름, 장소로 검색 (예: 강남역)',
+                            hintText: 'Search a place (e.g. Jeju Airport)',
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
                             focusedBorder: InputBorder.none,
@@ -263,7 +263,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           child: FilledButton.icon(
             onPressed: _confirm,
             icon: const Icon(Icons.check),
-            label: const Text('이 위치로 확정'),
+            label: const Text('Use this location'),
           ),
         ),
       ),

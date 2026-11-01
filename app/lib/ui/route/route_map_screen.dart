@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 
 import '../../const/value/app_theme.dart';
+import '../../utils/romanize.dart';
 
 /// 수거 동선 (Claude Design 시안 ④):
 /// 번호 원형 핀(초록, 흰 테두리) + 점선 경로 + 하단 방문 순서 카드
@@ -87,7 +88,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       Marker(
         markerId: 'depot',
         latLng: LatLng(widget.depotLat, widget.depotLng),
-        markerImageSrc: _pinDataUri('출발', '#17261D', '#FFFFFF',
+        markerImageSrc: _pinDataUri('Depot', '#17261D', '#FFFFFF',
             fontSize: 11),
         width: 48,
         height: 48,
@@ -96,10 +97,11 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       ),
     };
     for (final s in widget.stops) {
-      final short = ((s['label'] as String?) ?? '')
+      // 핀 라벨은 짧아야 하므로 시도·시군구를 떼고 로마자로 표시
+      final short = romanizeAddress(((s['label'] as String?) ?? '')
           .replaceFirst('제주특별자치도 ', '')
           .replaceFirst('제주시 ', '')
-          .replaceFirst('서귀포시 ', '');
+          .replaceFirst('서귀포시 ', ''));
       markers.add(Marker(
         markerId: 'stop${s['seq']}',
         latLng: LatLng(s['lat'] as double, s['lng'] as double),
@@ -202,7 +204,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         : 0;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('수거 동선')),
+      appBar: AppBar(title: const Text('Collection route')),
       body: Column(
         children: [
           if (segCount > 1)
@@ -212,7 +214,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
               child: Row(
                 children: [
-                  const Text('구간',
+                  const Text('Legs',
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -230,9 +232,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                     const SizedBox(width: 4),
                     Text(
                       i == 0
-                          ? '출발→①'
+                          ? 'Depot→1'
                           : (i == segCount - 1
-                              ? '→복귀'
+                              ? '→back'
                               : '→${i + 1}'),
                       style: const TextStyle(
                           fontSize: 11, color: AppColors.sub),
@@ -256,7 +258,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
             color: AppColors.bg,
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
             alignment: Alignment.centerLeft,
-            child: const Text('방문 순서',
+            child: const Text('Visit order',
                 style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -272,8 +274,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (context, i) {
                 final s = widget.stops[i];
-                final label = ((s['label'] as String?) ?? '')
-                    .replaceFirst('제주특별자치도 ', '');
+                final label = romanizeAddress(
+                    ((s['label'] as String?) ?? '')
+                        .replaceFirst('제주특별자치도 ', ''));
                 return Container(
                   width: 170,
                   padding: const EdgeInsets.all(12),

@@ -11,9 +11,11 @@ const String kSupabaseUrl = 'https://xpkifseyiphyvoppcsui.supabase.co';
 /// Publishable key (anon 역할, RLS 전제 — 앱에 포함 가능)
 const String kSupabaseAnonKey = 'sb_publishable_JNTxRVuSMHQV1-aoL7tOLg_gc6e8Cn-';
 
-/// 카카오맵 JavaScript 키 (앱: BikeReclaim, ID 1514725)
-/// ※ 카카오 콘솔에서 Web 플랫폼(http://localhost) 등록 + 카카오맵 활성화 필요
-const String kKakaoJsKey = '69c16e042a28b0f92bdd91e61421c3cc';
+/// 카카오맵 JavaScript 키 (앱: Bike Loop, ID 1622635 — 2026-10-26 재발급)
+/// ※ 이전 앱(ID 1514725)이 콘솔에서 사라져 모든 화면에서 지도가 뜨지 않았다.
+///   새 앱을 만들고 키를 교체함. Web 플랫폼(http://localhost) 등록과
+///   카카오맵 활성화가 되어 있어야 지도가 로드된다.
+const String kKakaoJsKey = 'f143629fbc328db1b57a03365760a430';
 
 /// 사진 버킷 이름
 const String kPhotoBucket = 'report-photos';
@@ -31,7 +33,11 @@ const String kOptimizeUrl = '$kServerBase/optimize';
 const String kAddressUrl = '$kServerBase/address';
 const String kSearchUrl = '$kServerBase/search';
 
-/// 기본 지도 중심: 대한민국 중심부 (전국 서비스, 2026-08-12)
+/// ⚠ demo-en 브랜치 — 영어 시연 영상 전용 설정
+/// 기능·서비스 범위는 main과 동일한 '전국'이고, 화면 문구만 영어다.
+/// 시연이 끝나면 main 브랜치로 돌아갈 것.
+
+/// 기본 지도 중심: 대한민국 중심부 (전국 서비스)
 /// GPS를 얻으면 그 위치로, 못 얻으면 이 좌표로 지도를 연다.
 const double kDefaultLat = 36.3400;
 const double kDefaultLng = 127.7700;
@@ -53,36 +59,37 @@ bool isInKorea(double lat, double lng) =>
     lng >= kKoreaMinLng &&
     lng <= kKoreaMaxLng;
 
-const String kOutOfServiceMsg = '서비스 지역(대한민국)이 아닙니다';
+const String kOutOfServiceMsg = 'Outside the service area (South Korea)';
 
 /// 기본 출발지/보관소 — 지역별 기본값은 const/value/regions.dart 참조.
-/// 최초 실행 시(지역 미선택) 사용할 폴백 주소.
+/// ※ 주소 문자열은 카카오 검색 질의에 그대로 쓰이므로 한글이어야 한다.
+///   화면에 보일 때는 romanize.dart가 로마자로 바꿔준다.
 const String kDefaultDepotAddress = '세종특별자치시 한누리대로 2130';
 
-/// 자전거 상태 유형 (기획안 4.1 — DB condition 값 ↔ 한글 라벨)
+/// 자전거 상태 유형 (DB condition 값 ↔ 표시 라벨)
 const Map<String, String> kConditionLabels = {
-  'long_term': '장기 방치 의심',
-  'damaged': '파손',
-  'obstruction': '통행 방해',
-  'parts_missing': '부품 분실',
-  'other': '기타',
+  'long_term': 'Long-abandoned',
+  'damaged': 'Damaged',
+  'obstruction': 'Blocking path',
+  'parts_missing': 'Missing parts',
+  'other': 'Other',
 };
 
-/// 재고 상태 (bikes.state ↔ 한글 라벨)
+/// 재고 상태 (bikes.state ↔ 표시 라벨)
 const Map<String, String> kBikeStateLabels = {
-  'storage': '보관',
-  'repair': '수리',
-  'donation': '기부',
-  'reuse': '재사용',
-  'disposal': '폐기',
+  'storage': 'Stored',
+  'repair': 'Repair',
+  'donation': 'Donated',
+  'reuse': 'Reused',
+  'disposal': 'Disposed',
 };
 
-/// 신고 처리 상태 (DB status 값 ↔ 한글 라벨)
+/// 신고 처리 상태 (DB status 값 ↔ 표시 라벨)
 const Map<String, String> kStatusLabels = {
-  'submitted': '접수됨',
-  'approved': '승인됨',
-  'rejected': '반려',
-  'duplicate': '중복 신고',
-  'scheduled': '수거 예정',
-  'collected': '수거 완료',
+  'submitted': 'Submitted',
+  'approved': 'Approved',
+  'rejected': 'Rejected',
+  'duplicate': 'Duplicate',
+  'scheduled': 'Scheduled',
+  'collected': 'Collected',
 };

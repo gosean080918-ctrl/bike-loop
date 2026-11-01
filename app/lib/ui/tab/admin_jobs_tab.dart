@@ -6,6 +6,7 @@ import '../../const/model/report.dart';
 import '../../const/value/app_theme.dart';
 import '../../const/value/constants.dart';
 import '../../const/value/regions.dart';
+import '../../utils/romanize.dart';
 import '../../service/settings_service.dart';
 import '../../state_management/providers.dart';
 import '../route/depot_picker_screen.dart';
@@ -46,7 +47,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
       ref.invalidate(depotProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('출발지가 ${rd.depotName}으로 설정되었습니다')));
+            SnackBar(content: Text('Depot set to ${rd.depotName}')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -74,19 +75,19 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
       final ok = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: const Text('여러 지역이 섞여 있습니다'),
+              title: const Text('Multiple regions selected'),
               content: Text(
-                  '선택한 신고가 ${targetRegions.join(', ')} 에 걸쳐 있습니다.\n'
-                  '한 차량이 지역을 넘나들면 이동거리가 매우 커지고 '
-                  '경로 생성이 실패할 수 있습니다.\n\n'
-                  '위의 담당 지역을 골라 한 지역씩 처리하는 것을 권합니다.'),
+                  'The selected reports span ${targetRegions.length} regions.\n'
+                  'One vehicle crossing regions means a very long route and '
+                  'the optimizer may refuse it.\n\n'
+                  'Pick a region above and handle one at a time.'),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('취소')),
+                    child: const Text('Cancel')),
                 FilledButton(
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('그래도 생성')),
+                    child: const Text('Create anyway')),
               ],
             ),
           ) ??
@@ -103,22 +104,21 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
         final choice = await showDialog<String>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('출발지가 다른 지역입니다'),
-            content: Text('수거 대상은 $target인데 '
-                '출발지는 $depotRegion으로 설정되어 있습니다.\n'
-                '이대로 만들면 지역을 가로지르는 동선이 됩니다.\n\n'
-                '${rd == null ? '' : '출발지를 ${rd.depotName}으로 바꿀까요?'}'),
+            title: const Text('Depot is in another region'),
+            content: Text('Targets are in $target but the depot is in $depotRegion.\n'
+                'This would create a route across regions.\n\n'
+                '${rd == null ? '' : 'Switch the depot to ${rd.depotName}?'}'),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx, 'cancel'),
-                  child: const Text('취소')),
+                  child: const Text('Cancel')),
               TextButton(
                   onPressed: () => Navigator.pop(ctx, 'keep'),
-                  child: const Text('그대로 진행')),
+                  child: const Text('Keep')),
               if (rd != null)
                 FilledButton(
                     onPressed: () => Navigator.pop(ctx, 'switch'),
-                    child: const Text('바꾸고 진행')),
+                    child: const Text('Switch and continue')),
             ],
           ),
         );
@@ -166,13 +166,13 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                       strokeWidth: 3.2, color: AppColors.primary),
                 ),
                 const SizedBox(height: 20),
-                const Text('최적 경로를 계산하고 있습니다',
+                const Text('Calculating the optimal route',
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: AppColors.ink)),
                 const SizedBox(height: 6),
-                Text('${targets.length}개 지점 · 잠시만 기다려주세요',
+                Text('${targets.length} stops · one moment',
                     style: const TextStyle(
                         fontSize: 13, color: AppColors.muted)),
               ],
@@ -199,7 +199,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
       ref.invalidate(jobsProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('수거 경로가 생성되었습니다')));
+            const SnackBar(content: Text('Collection route created')));
       }
     } catch (e) {
       if (mounted) {
@@ -220,15 +220,15 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('신고 삭제'),
-        content: const Text('이 신고를 영구 삭제할까요?\n(테스트/오입력 데이터 정리용)'),
+        title: const Text('Delete report'),
+        content: const Text('Permanently delete this report?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('취소')),
+              child: const Text('Cancel')),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('삭제')),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -241,12 +241,12 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
       ref.invalidate(pendingReportsProvider);
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('삭제되었습니다')));
+            .showSnackBar(const SnackBar(content: Text('Deleted')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
+            .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
       }
     }
   }
@@ -256,16 +256,16 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('수거 작업 삭제'),
-        content: Text('이 작업($stopCount지점)을 목록에서 지울까요?\n'
-            '수거 완료된 신고와 재고는 그대로 남습니다.'),
+        title: const Text('Delete job'),
+        content: Text('Remove this job ($stopCount stops) from the list?\n'
+            'Collected reports and inventory are kept.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('취소')),
+              child: const Text('Cancel')),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('삭제')),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -278,12 +278,12 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
       ref.invalidate(dashboardProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('작업이 삭제되었습니다')));
+            const SnackBar(content: Text('Job deleted')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
+            .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
       }
     }
   }
@@ -296,7 +296,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
     final pick = await Navigator.of(context).push<DepotPick>(
       MaterialPageRoute(
         builder: (_) => DepotPickerScreen(
-          title: isReturn ? '복귀지 선택' : '출발지 선택',
+          title: isReturn ? 'Select return point' : 'Select depot',
           currentAddress:
               isReturn ? depot.returnAddress : depot.address,
           initialLat: isReturn ? depot.returnLat : depot.lat,
@@ -315,7 +315,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
-              '${isReturn ? '복귀지' : '출발지'}가 변경되었습니다: ${pick.address}')));
+              '${isReturn ? 'Return point' : 'Depot'} set: ${romanizeAddress(pick.address)}')));
     }
   }
 
@@ -339,13 +339,13 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
               const Icon(Icons.home_work_outlined,
                   size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
-              const Text('출발지',
+              const Text('Depot',
                   style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w700)),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  d.address.isEmpty ? '(설정 안 됨)' : d.address,
+                  d.address.isEmpty ? '(not set)' : d.address,
                   style: const TextStyle(
                       fontSize: 13, color: AppColors.sub),
                   maxLines: 2,
@@ -354,7 +354,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
               ),
               GestureDetector(
                 onTap: () => _changeDepot(isReturn: false),
-                child: const Text('변경',
+                child: const Text('Change',
                     style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -368,16 +368,16 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
               const Icon(Icons.keyboard_return,
                   size: 18, color: AppColors.muted),
               const SizedBox(width: 8),
-              const Text('복귀지',
+              const Text('Return',
                   style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w700)),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   d.returnSameAsDepot
-                      ? '출발지와 동일'
+                      ? 'Same as depot'
                       : (d.returnAddress.isEmpty
-                          ? '(설정 안 됨)'
+                          ? '(not set)'
                           : d.returnAddress),
                   style: const TextStyle(
                       fontSize: 13, color: AppColors.sub),
@@ -393,7 +393,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                         .clearReturn();
                     ref.invalidate(depotProvider);
                   },
-                  child: const Text('동일하게',
+                  child: const Text('Same',
                       style: TextStyle(
                           fontSize: 13, color: AppColors.muted)),
                 ),
@@ -401,7 +401,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
               ],
               GestureDetector(
                 onTap: () => _changeDepot(isReturn: true),
-                child: const Text('변경',
+                child: const Text('Change',
                     style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -418,7 +418,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
   Future<void> _navigateTo(double lat, double lng) async {
     final appUrl = Uri.parse('kakaomap://route?ep=$lat,$lng&by=CAR');
     final webUrl =
-        Uri.parse('https://map.kakao.com/link/to/수거지점,$lat,$lng');
+        Uri.parse('https://map.kakao.com/link/to/Stop,$lat,$lng');
     if (await canLaunchUrl(appUrl)) {
       await launchUrl(appUrl);
     } else {
@@ -440,7 +440,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
         padding: const EdgeInsets.all(12),
         children: [
           // ---------- 담당 지역 (전국 확장) ----------
-          Text('담당 지역', style: Theme.of(context).textTheme.titleMedium),
+          Text('Region', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -464,11 +464,11 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                     child: DropdownButton<String?>(
                       isExpanded: true,
                       value: _region,
-                      hint: const Text('전체 지역',
+                      hint: const Text('All regions',
                           style: TextStyle(fontSize: 14)),
                       items: [
                         const DropdownMenuItem<String?>(
-                            value: null, child: Text('전체 지역')),
+                            value: null, child: Text('All regions')),
                         ...kRegions.map((r) => DropdownMenuItem<String?>(
                               value: r.name,
                               child: Text(r.name),
@@ -484,7 +484,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                 if (_region != null)
                   TextButton(
                     onPressed: _busy ? null : _useRegionDepot,
-                    child: Text('${depotOf(_region)?.depotName ?? ''} 사용',
+                    child: Text('Use ${depotOf(_region)?.depotName ?? ''}',
                         style: const TextStyle(fontSize: 12.5)),
                   ),
               ],
@@ -493,14 +493,14 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
           if (_region != null)
             const Padding(
               padding: EdgeInsets.only(top: 6, left: 4),
-              child: Text('※ 도 지역은 청사에서 멀면 이동거리가 커집니다. '
-                  '가까운 차고지가 있으면 아래에서 출발지를 바꾸세요.',
+              child: Text('A province office can be far from the sites. '
+                  'If you have a closer yard, change the depot below.',
                   style: TextStyle(fontSize: 11.5, color: AppColors.muted)),
             ),
           const SizedBox(height: 20),
 
           // ---------- 출발지/복귀지 (보관소) ----------
-          Text('출발·복귀 설정 (보관소)',
+          Text('Depot & return point',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           ref.watch(depotProvider).when(
@@ -514,26 +514,26 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2))),
                 ),
-                error: (e, _) => Text('설정 오류: $e'),
+                error: (e, _) => Text('Settings error: $e'),
               ),
           const SizedBox(height: 20),
 
           // ---------- 수거 대상 선택 (ADM-03) ----------
           Text(
               _region == null
-                  ? '수거 대상 선택 (승인된 신고)'
-                  : '수거 대상 선택 — $_region',
+                  ? 'Select targets (approved)'
+                  : 'Select targets — $_region',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           approved.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text('오류: $e'),
+            error: (e, _) => Text('Error: $e'),
             data: (all) => switch (_filtered(all)) {
               final list when list.isEmpty => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text(_region == null
-                      ? '승인된 신고가 없습니다. 검토 탭에서 먼저 승인하세요.'
-                      : '$_region에 승인된 신고가 없습니다.'),
+                      ? 'No approved reports. Approve some in the Review tab.'
+                      : 'No approved reports in $_region.'),
                 ),
               final list => Column(
                     children: [
@@ -550,7 +550,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                             secondary: IconButton(
                               icon: const Icon(Icons.delete_outline,
                                   size: 20),
-                              tooltip: '신고 삭제',
+                              tooltip: 'Delete report',
                               onPressed: () => _deleteReport(r.id),
                             ),
                           )),
@@ -561,7 +561,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                             controller: _capacity,
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
-                                labelText: '차량 적재량(대)',
+                                labelText: 'Vehicle capacity',
                                 border: OutlineInputBorder()),
                           ),
                         ),
@@ -571,7 +571,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                             controller: _workMin,
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
-                                labelText: '작업시간(분)',
+                                labelText: 'Work time (min)',
                                 border: OutlineInputBorder()),
                           ),
                         ),
@@ -590,7 +590,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                                   child: CircularProgressIndicator(
                                       strokeWidth: 2))
                               : const Icon(Icons.route),
-                          label: Text('최적 수거 경로 생성 (${_selected.length}건)'),
+                          label: Text('Generate optimal route (${_selected.length})'),
                         ),
                       ),
                     ],
@@ -600,15 +600,15 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
           const Divider(height: 32),
 
           // ---------- 작업 목록 (ADM-04~07) ----------
-          Text('수거 작업', style: Theme.of(context).textTheme.titleMedium),
+          Text('Collection jobs', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           jobs.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text('오류: $e'),
+            error: (e, _) => Text('Error: $e'),
             data: (list) => list.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Text('생성된 작업이 없습니다.'),
+                    child: Text('No jobs yet.'),
                   )
                 : Column(
                     children: list.map((j) => _jobCard(j)).toList()),
@@ -628,16 +628,16 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
     final durS = j['total_duration_s'];
     final jobId = j['id'] as String;
     final summary = [
-      '${stops.length}개 지점',
-      if (dist != null) '총 ${(dist / 1000).toStringAsFixed(1)}km',
-      if (durS != null) '예상 ${(durS / 60).round()}분',
+      '${stops.length} stops',
+      if (dist != null) '${(dist / 1000).toStringAsFixed(1)} km',
+      if (durS != null) '~${(durS / 60).round()} min',
     ].join(' · ');
 
     return Card(
       child: ExpansionTile(
         leading: IconButton(
           icon: const Icon(Icons.map_outlined),
-          tooltip: '동선 지도 보기',
+          tooltip: 'Route map',
           onPressed: () {
             Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => RouteMapScreen(
@@ -666,7 +666,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.2)),
         subtitle: Text(
-            '${(j['created_at'] as String).substring(0, 10)} · ${status == 'done' ? '완료' : '진행 중'} · $doneCount/${stops.length} 수거',
+            '${(j['created_at'] as String).substring(0, 10)} · ${status == 'done' ? 'done' : 'in progress'} · $doneCount/${stops.length} collected',
             style: const TextStyle(
                 fontSize: 12.5, color: AppColors.muted)),
         trailing: Row(
@@ -675,7 +675,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
             IconButton(
               icon: const Icon(Icons.delete_outline,
                   size: 20, color: AppColors.muted),
-              tooltip: '작업 삭제',
+              tooltip: 'Delete job',
               onPressed: () => _deleteJob(jobId, stops.length),
             ),
             const Icon(Icons.expand_more, color: AppColors.muted),
@@ -705,7 +705,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.navigation, size: 20),
-                    tooltip: '카카오맵 길안내',
+                    tooltip: 'Navigate',
                     onPressed: () => _navigateTo(lat, lng),
                   ),
                   done
@@ -724,7 +724,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                             ref.invalidate(activeReportsProvider);
                             ref.invalidate(dashboardProvider);
                           },
-                          child: const Text('수거 완료'),
+                          child: const Text('Collected'),
                         ),
                 ],
               ),
@@ -738,7 +738,7 @@ class _AdminJobsTabState extends ConsumerState<AdminJobsTab> {
                   await ref.read(adminServiceProvider).finishJob(jobId);
                   ref.invalidate(jobsProvider);
                 },
-                child: const Text('작업 종료'),
+                child: const Text('Finish job'),
               ),
             ),
         ],

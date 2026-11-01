@@ -40,32 +40,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         : const [MapTab(), ReportTab(), MyReportsTab()];
     final destinations = isAdmin
         ? const [
-            NavigationDestination(icon: Icon(Icons.map), label: '지도'),
+            NavigationDestination(icon: Icon(Icons.map), label: 'Map'),
             NavigationDestination(
-                icon: Icon(Icons.fact_check), label: '검토'),
+                icon: Icon(Icons.fact_check), label: 'Review'),
             NavigationDestination(
-                icon: Icon(Icons.local_shipping), label: '작업'),
+                icon: Icon(Icons.local_shipping), label: 'Jobs'),
             NavigationDestination(
-                icon: Icon(Icons.inventory_2), label: '재고'),
+                icon: Icon(Icons.inventory_2), label: 'Inventory'),
             NavigationDestination(
-                icon: Icon(Icons.bar_chart), label: '통계'),
+                icon: Icon(Icons.bar_chart), label: 'Stats'),
           ]
         : const [
-            NavigationDestination(icon: Icon(Icons.map), label: '지도'),
+            NavigationDestination(icon: Icon(Icons.map), label: 'Map'),
             NavigationDestination(
-                icon: Icon(Icons.add_a_photo), label: '신고'),
+                icon: Icon(Icons.add_a_photo), label: 'Report'),
             NavigationDestination(
-                icon: Icon(Icons.receipt_long), label: '내 신고'),
+                icon: Icon(Icons.receipt_long), label: 'My Reports'),
           ];
     if (_index >= tabs.length) _index = 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: BrandWordmark(suffix: isAdmin ? '관리자' : null),
+        title: BrandWordmark(suffix: isAdmin ? 'Admin' : null),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            tooltip: '로그아웃',
+            tooltip: 'Sign out',
             onPressed: () => ref.read(authServiceProvider).signOut(),
           ),
         ],
@@ -77,12 +77,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               icon: const Icon(Icons.add_a_photo),
-              label: const Text('신고',
+              label: const Text('Report',
                   style: TextStyle(fontWeight: FontWeight.w700)),
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => Scaffold(
-                    appBar: AppBar(title: const Text('방치 자전거 신고')),
+                    appBar: AppBar(title: const Text('Report a bicycle')),
                     body: const ReportTab(),
                   ),
                 ),

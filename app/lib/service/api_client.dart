@@ -43,5 +43,5 @@ class ApiClient {
 
   /// 서버가 401을 돌려줬을 때 사용자에게 보여줄 안내 문구.
   /// (토큰 만료 등 — 다시 로그인하면 해결된다)
-  static const String authErrorMessage = '로그인이 만료되었습니다. 다시 로그인해주세요.';
+  static const String authErrorMessage = 'Your session expired. Please sign in again.';
 }

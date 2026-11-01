@@ -19,7 +19,7 @@ class AdminDashboardTab extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ListView(children: [
           const SizedBox(height: 100),
-          Center(child: Text('통계 조회 실패: $e')),
+          Center(child: Text('Could not load statistics: $e')),
         ]),
         data: (d) {
           final byStatus = (d['byStatus'] as Map).cast<String, int>();
@@ -33,22 +33,22 @@ class AdminDashboardTab extends ConsumerWidget {
             children: [
               // ── 핵심 지표 4개 ──
               Row(children: [
-                _metric('총 신고', '${d['reportTotal']}건',
+                _metric('Reports', '${d['reportTotal']}',
                     AppColors.primarySoft, AppColors.primary),
                 const SizedBox(width: 10),
-                _metric('수거 완료', '${d['collected']}대',
+                _metric('Collected', '${d['collected']}',
                     AppColors.doneBg, AppColors.doneFg),
               ]),
               const SizedBox(height: 10),
               Row(children: [
-                _metric('수거 작업', '${d['jobCount']}회',
+                _metric('Jobs', '${d['jobCount']}',
                     AppColors.pendingBg, AppColors.pendingFg),
                 const SizedBox(width: 10),
                 _metric(
-                    '평균 처리',
+                    'Avg. time',
                     (d['avgLeadDays'] as double) == 0
                         ? '-'
-                        : '${(d['avgLeadDays'] as double).toStringAsFixed(1)}일',
+                        : '${(d['avgLeadDays'] as double).toStringAsFixed(1)}d',
                     AppColors.grayBg,
                     AppColors.grayFg),
               ]),
@@ -56,7 +56,7 @@ class AdminDashboardTab extends ConsumerWidget {
 
               // ── 순환 성과 (대회 어필 포인트) ──
               _card(
-                title: '순환 성과',
+                title: 'Circulation',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -71,14 +71,14 @@ class AdminDashboardTab extends ConsumerWidget {
                                 color: AppColors.primary,
                                 letterSpacing: -1)),
                         const SizedBox(width: 8),
-                        const Text('재생률',
+                        const Text('recycle rate',
                             style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.sub)),
                         const Spacer(),
                         Text(
-                            '재생 ${d['recycled']}대 · 폐기 ${d['disposed']}대',
+                            '${d['recycled']} saved · ${d['disposed']} disposed',
                             style: const TextStyle(
                                 fontSize: 12, color: AppColors.muted)),
                       ],
@@ -105,7 +105,7 @@ class AdminDashboardTab extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text('수리·기부·재사용으로 살린 비율입니다',
+                    const Text('Share saved through repair, donation or reuse',
                         style: TextStyle(
                             fontSize: 12, color: AppColors.muted)),
                   ],
@@ -115,7 +115,7 @@ class AdminDashboardTab extends ConsumerWidget {
 
               // ── 재고 상태 ──
               _card(
-                title: '재고 현황 (총 ${d['bikeTotal']}대)',
+                title: 'Inventory (${d['bikeTotal']} total)',
                 child: Column(
                   children: [
                     for (final e in kBikeStateLabels.entries)
@@ -128,7 +128,7 @@ class AdminDashboardTab extends ConsumerWidget {
 
               // ── 신고 처리 현황 ──
               _card(
-                title: '신고 처리 현황',
+                title: 'Report status',
                 child: Column(
                   children: [
                     for (final e in kStatusLabels.entries)
@@ -142,7 +142,7 @@ class AdminDashboardTab extends ConsumerWidget {
 
               // ── 신고 유형 분포 ──
               _card(
-                title: '신고 유형 분포',
+                title: 'Report types',
                 child: Column(
                   children: [
                     for (final e in kConditionLabels.entries)
@@ -156,20 +156,20 @@ class AdminDashboardTab extends ConsumerWidget {
 
               // ── 운영 효율 ──
               _card(
-                title: '운영 효율',
+                title: 'Efficiency',
                 child: Column(
                   children: [
-                    _kv('누적 이동거리',
+                    _kv('Total distance',
                         '${(d['totalDistanceKm'] as double).toStringAsFixed(1)} km'),
-                    _kv('누적 작업시간',
-                        '${(d['totalDurationMin'] as double).round()} 분'),
+                    _kv('Total time',
+                        '${(d['totalDurationMin'] as double).round()} min'),
                     _kv(
-                        '작업당 평균 거리',
+                        'Per job',
                         (d['jobCount'] as int) == 0
                             ? '-'
                             : '${((d['totalDistanceKm'] as double) / (d['jobCount'] as int)).toStringAsFixed(1)} km'),
                     _kv(
-                        '자전거 1대당 이동',
+                        'Per bicycle',
                         (d['collected'] as int) == 0
                             ? '-'
                             : '${((d['totalDistanceKm'] as double) / (d['collected'] as int)).toStringAsFixed(1)} km'),
@@ -178,7 +178,7 @@ class AdminDashboardTab extends ConsumerWidget {
               ),
               const SizedBox(height: 10),
               const Center(
-                child: Text('※ 경로는 OR-Tools 최적화 + 카카오 도로 기준입니다',
+                child: Text('Routes: OR-Tools optimization on Kakao road data',
                     style: TextStyle(
                         fontSize: 11.5, color: AppColors.muted)),
               ),

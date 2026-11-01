@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../const/value/app_theme.dart';
 import '../../const/value/constants.dart';
 import '../../state_management/providers.dart';
+import '../../utils/romanize.dart';
 import '../component/signed_photo.dart';
 
 /// ADM-08: 수거 완료 재고 목록 — 관리번호/사진/신고위치/신고일/수거일/
@@ -56,7 +57,7 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('재고 조회 실패: $e')));
+            .showSnackBar(SnackBar(content: Text('Could not load inventory: $e')));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -68,16 +69,17 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('재고 삭제'),
-        content: Text('${b['code'] ?? ''} 항목을 재고 목록에서 지울까요?\n'
-            '신고 기록은 ‘수거 완료’로 그대로 남습니다.'),
+        title: const Text('Delete from inventory'),
+        content: Text('Remove ${romanizeCode(b['code'] as String?)} '
+            'from the inventory list?\n'
+            'The report stays recorded as collected.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('취소')),
+              child: const Text('Cancel')),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('삭제')),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -89,12 +91,12 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
       _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('재고에서 삭제되었습니다')));
+            const SnackBar(content: Text('Removed from inventory')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
+            .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
       }
     }
   }
@@ -130,19 +132,19 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(b['code'] as String? ?? '(번호 없음)',
+                      Text(romanizeCode(b['code'] as String?).isEmpty ? '(no code)' : romanizeCode(b['code'] as String?),
                           style: const TextStyle(
                               fontSize: 18, fontWeight: FontWeight.w800)),
                       Text(
-                        report?['address'] as String? ?? '주소 없음',
+                        report?['address'] as String? ?? 'No address',
                         style: const TextStyle(
                             fontSize: 13, color: AppColors.muted),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        '신고 ${fmt.format(DateTime.parse(report?['reported_at'] as String? ?? b['collected_at'] as String))}'
-                        ' · 수거 ${fmt.format(DateTime.parse(b['collected_at'] as String))}',
+                        'Reported ${fmt.format(DateTime.parse(report?['reported_at'] as String? ?? b['collected_at'] as String))}'
+                        ' · collected ${fmt.format(DateTime.parse(b['collected_at'] as String))}',
                         style: const TextStyle(
                             fontSize: 12, color: AppColors.dateGray),
                       ),
@@ -152,7 +154,7 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
               ],
             ),
             const SizedBox(height: 18),
-            const Text('상태 변경',
+            const Text('Change state',
                 style:
                     TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
@@ -174,7 +176,7 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
               ],
             ),
             const SizedBox(height: 16),
-            const Text('보관 장소',
+            const Text('Storage location',
                 style:
                     TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
@@ -184,7 +186,7 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
                   child: TextField(
                     controller: storageCtl,
                     decoration: const InputDecoration(
-                        hintText: '예: 보관소 A동 3번 랙'),
+                        hintText: 'e.g. Warehouse A, rack 3'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -197,7 +199,7 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
                     if (ctx.mounted) Navigator.pop(ctx);
                     _load();
                   },
-                  child: const Text('저장'),
+                  child: const Text('Save'),
                 ),
               ],
             ),
@@ -235,13 +237,13 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              const Text('총 보유',
+              const Text('In stock',
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.muted)),
               const SizedBox(width: 8),
-              Text('$_total대',
+              Text('$_total',
                   style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -304,7 +306,7 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
             controller: _search,
             onSubmitted: (_) => _load(),
             decoration: InputDecoration(
-              hintText: '관리번호 검색 (예: 서귀포시_20260721)',
+              hintText: 'Search by code (e.g. Jeju_Seogwipo-si)',
               prefixIcon:
                   const Icon(Icons.search, color: AppColors.faint),
               suffixIcon: IconButton(
@@ -321,7 +323,7 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             children: [
               ChoiceChip(
-                label: const Text('전체'),
+                label: const Text('All'),
                 selected: _stateFilter == null,
                 onSelected: (_) {
                   setState(() => _stateFilter = null);
@@ -352,7 +354,7 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
                       ? ListView(children: const [
                           SizedBox(height: 120),
                           Center(
-                              child: Text('수거된 자전거가 없습니다.',
+                              child: Text('No collected bicycles yet.',
                                   style: TextStyle(
                                       color: AppColors.muted))),
                         ])
@@ -406,7 +408,7 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
                                                   TextOverflow.ellipsis),
                                           const SizedBox(height: 2),
                                           Text(
-                                            '수거 ${fmt.format(DateTime.parse(b['collected_at'] as String))}',
+                                            'Collected ${fmt.format(DateTime.parse(b['collected_at'] as String))}',
                                             style: const TextStyle(
                                                 fontSize: 11.5,
                                                 color: AppColors
@@ -414,8 +416,9 @@ class _AdminInventoryTabState extends ConsumerState<AdminInventoryTab> {
                                           ),
                                           const SizedBox(height: 3),
                                           Text(
-                                            r?['address'] as String? ??
-                                                '주소 없음',
+                                            romanizeAddress(r?['address'] as String?).isEmpty
+                                                ? 'No address'
+                                                : romanizeAddress(r?['address'] as String?),
                                             style: const TextStyle(
                                                 fontSize: 13,
                                                 color: AppColors.sub),

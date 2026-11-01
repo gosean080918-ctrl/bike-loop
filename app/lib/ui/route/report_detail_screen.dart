@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../const/model/report.dart';
 import '../../const/value/app_theme.dart';
 import '../../const/value/constants.dart';
+import '../../utils/romanize.dart';
 
 /// ADM-10: 신고 상세 보기
 ///
@@ -37,7 +38,7 @@ class ReportDetailScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('신고 상세', style: TextStyle(fontSize: 20)),
+        title: const Text('Report detail', style: TextStyle(fontSize: 20)),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
@@ -70,15 +71,15 @@ class ReportDetailScreen extends StatelessWidget {
 
           // ── 기본 정보 ──
           _card(
-            title: '신고 정보',
+            title: 'Report',
             child: Column(
               children: [
-                _row('신고 일시', fmt.format(r.reportedAt)),
-                _row('주소', r.address ?? '(주소 정보 없음)'),
-                _row('좌표', coord, copyable: true, context: context),
-                if (r.priority > 0) _row('우선순위', '${r.priority}'),
+                _row('Reported', fmt.format(r.reportedAt)),
+                _row('Address', romanizeAddress(r.address).isEmpty ? '(no address)' : romanizeAddress(r.address)),
+                _row('Coordinates', coord, copyable: true, context: context),
+                if (r.priority > 0) _row('Priority', '${r.priority}'),
                 if (r.collectedAt != null)
-                  _row('수거 완료', fmt.format(r.collectedAt!)),
+                  _row('Collected', fmt.format(r.collectedAt!)),
               ],
             ),
           ),
@@ -86,16 +87,16 @@ class ReportDetailScreen extends StatelessWidget {
 
           // ── 신고자 (관리자만 조회 가능 — profiles RLS) ──
           _card(
-            title: '신고자',
+            title: 'Reporter',
             child: _Reporter(reporterId: r.reporterId),
           ),
           const SizedBox(height: 12),
 
           // ── 상세 설명 ──
           _card(
-            title: '상세 설명',
+            title: 'Description',
             child: Text(
-              r.description.isEmpty ? '(작성된 설명이 없습니다)' : r.description,
+              r.description.isEmpty ? '(no description)' : r.description,
               style: TextStyle(
                 fontSize: 15,
                 height: 1.55,
@@ -126,7 +127,7 @@ class ReportDetailScreen extends StatelessWidget {
                       child: FilledButton(
                         onPressed: () =>
                             Navigator.pop(context, 'approve'),
-                        child: const Text('승인'),
+                        child: const Text('Approve'),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -134,7 +135,7 @@ class ReportDetailScreen extends StatelessWidget {
                       child: OutlinedButton(
                         onPressed: () =>
                             Navigator.pop(context, 'reject'),
-                        child: const Text('반려'),
+                        child: const Text('Reject'),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -142,7 +143,7 @@ class ReportDetailScreen extends StatelessWidget {
                       child: OutlinedButton(
                         onPressed: () =>
                             Navigator.pop(context, 'duplicate'),
-                        child: const Text('중복'),
+                        child: const Text('Duplicate'),
                       ),
                     ),
                   ],
@@ -203,7 +204,7 @@ class ReportDetailScreen extends StatelessWidget {
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: v));
                       ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('복사했습니다')));
+                          const SnackBar(content: Text('Copied')));
                     },
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -234,7 +235,7 @@ class _Reporter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (reporterId.isEmpty) return const _ReporterText('(신고자 정보 없음)');
+    if (reporterId.isEmpty) return const _ReporterText('(no reporter info)');
 
     return FutureBuilder<Map<String, dynamic>?>(
       future: Supabase.instance.client
@@ -244,17 +245,17 @@ class _Reporter extends StatelessWidget {
           .maybeSingle(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const _ReporterText('불러오는 중…');
+          return const _ReporterText('Loading…');
         }
         if (snap.hasError || snap.data == null) {
           // 05_profile_email.sql 미적용이거나 권한 없음
-          return const _ReporterText('(조회 불가 — 05_profile_email.sql 확인)');
+          return const _ReporterText('(unavailable)');
         }
 
         final email = (snap.data!['email'] as String?)?.trim() ?? '';
         final name = (snap.data!['display_name'] as String?)?.trim() ?? '';
 
-        if (email.isEmpty) return _ReporterText(name.isEmpty ? '(이메일 없음)' : name);
+        if (email.isEmpty) return _ReporterText(name.isEmpty ? '(no email)' : name);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,7 +276,7 @@ class _Reporter extends StatelessWidget {
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: email));
                       ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('이메일을 복사했습니다')));
+                          const SnackBar(content: Text('Email copied')));
                     },
                     child: Row(
                       children: [
@@ -298,7 +299,7 @@ class _Reporter extends StatelessWidget {
                     mode: LaunchMode.externalApplication,
                   ),
                   icon: const Icon(Icons.mail_outline, size: 16),
-                  label: const Text('메일'),
+                  label: const Text('Mail'),
                 ),
               ],
             ),
@@ -325,14 +326,14 @@ class _Photo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (path.isEmpty) return _placeholder('사진 없음');
+    if (path.isEmpty) return _placeholder('No photo');
 
     return FutureBuilder<String>(
       future: Supabase.instance.client.storage
           .from(kPhotoBucket)
           .createSignedUrl(path, 3600),
       builder: (context, snap) {
-        if (snap.hasError) return _placeholder('사진을 불러오지 못했습니다');
+        if (snap.hasError) return _placeholder('Could not load photo');
         if (!snap.hasData) {
           return _placeholder(null, spinner: true);
         }
@@ -354,7 +355,7 @@ class _Photo extends StatelessWidget {
                   child: Image.network(url,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) =>
-                          _placeholder('사진을 불러오지 못했습니다')),
+                          _placeholder('Could not load photo')),
                 ),
               ),
               Positioned(
@@ -373,7 +374,7 @@ class _Photo extends StatelessWidget {
                       Icon(Icons.zoom_out_map_rounded,
                           size: 14, color: Colors.white),
                       SizedBox(width: 5),
-                      Text('탭하면 확대',
+                      Text('Tap to zoom',
                           style: TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w600,
@@ -451,7 +452,7 @@ class _FullScreenPhotoState extends State<_FullScreenPhoto> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('사진 크게 보기',
+        title: const Text('Photo',
             style: TextStyle(color: Colors.white, fontSize: 17)),
       ),
       body: GestureDetector(
@@ -465,7 +466,7 @@ class _FullScreenPhotoState extends State<_FullScreenPhoto> {
             child: Image.network(
               widget.url,
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Text('사진을 불러오지 못했습니다',
+              errorBuilder: (_, __, ___) => const Text('Could not load photo',
                   style: TextStyle(color: Colors.white70)),
             ),
           ),

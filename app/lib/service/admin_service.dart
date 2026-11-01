@@ -96,11 +96,11 @@ class AdminService {
     );
     if (res.statusCode == 401) throw Exception(ApiClient.authErrorMessage);
     if (res.statusCode == 429) {
-      throw Exception('요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.');
+      throw Exception('Too many requests. Please try again shortly.');
     }
     if (res.statusCode != 200) {
       // 서버가 설명을 준 경우 그대로 보여준다(예: 용량/시간 초과 안내)
-      String msg = '서버 오류(${res.statusCode})';
+      String msg = 'Server error (${res.statusCode})';
       try {
         final d = jsonDecode(utf8.decode(res.bodyBytes))['detail'];
         if (d is String && d.isNotEmpty) msg = d;
@@ -109,7 +109,7 @@ class AdminService {
     }
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     final routes = body['routes'] as List;
-    if (routes.isEmpty) throw Exception('생성된 경로가 없습니다');
+    if (routes.isEmpty) throw Exception('No route was generated');
     final route = routes.first as Map<String, dynamic>;
 
     // 2) 작업 저장 (도로 경로가 있으면 폴리라인도 함께)

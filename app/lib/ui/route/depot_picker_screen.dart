@@ -113,7 +113,7 @@ class _DepotPickerScreenState extends ConsumerState<DepotPickerScreen> {
               onChanged: (v) => setState(() => _filter = v),
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.search, size: 20),
-                hintText: '지역 검색 (예: 경기, 전남)',
+                hintText: 'Search a region',
               ),
             ),
           ),
@@ -123,7 +123,7 @@ class _DepotPickerScreenState extends ConsumerState<DepotPickerScreen> {
             child: OutlinedButton.icon(
               onPressed: _busy ? null : _pickOnMap,
               icon: const Icon(Icons.place_outlined, size: 18),
-              label: const Text('지도에서 직접 선택 (차고지 등)'),
+              label: const Text('Pick on the map (depot yard)'),
               style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(46)),
             ),

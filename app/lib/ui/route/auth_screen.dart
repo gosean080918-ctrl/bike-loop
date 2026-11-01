@@ -35,7 +35,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } on AuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('인증 오류: ${e.message}')));
+            .showSnackBar(SnackBar(content: Text('Auth error: ${e.message}')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -64,7 +64,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   const Center(child: BrandWordmark(fontSize: 30)),
                   const SizedBox(height: 6),
                   Text(
-                    '우리 동네 방치 자전거를 함께 정리해요',
+                    'Clear abandoned bicycles, together',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                         fontSize: 14, color: AppColors.textSub),
@@ -74,29 +74,31 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   if (_isSignUp) ...[
                     TextFormField(
                       controller: _name,
-                      decoration:
-                          const InputDecoration(labelText: '이름/별명'),
+                      decoration: const InputDecoration(
+                          labelText: 'Name / nickname'),
                       validator: (v) => (v == null || v.trim().isEmpty)
-                          ? '이름을 입력하세요'
+                          ? 'Please enter a name'
                           : null,
                     ),
                     const SizedBox(height: 12),
                   ],
                   TextFormField(
                     controller: _email,
-                    decoration: const InputDecoration(labelText: '이메일'),
+                    decoration: const InputDecoration(labelText: 'Email'),
                     keyboardType: TextInputType.emailAddress,
                     validator: (v) => (v == null || !v.contains('@'))
-                        ? '이메일 형식이 아닙니다'
+                        ? 'Enter a valid email address'
                         : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _password,
-                    decoration: const InputDecoration(labelText: '비밀번호'),
+                    decoration:
+                        const InputDecoration(labelText: 'Password'),
                     obscureText: true,
-                    validator: (v) =>
-                        (v == null || v.length < 6) ? '6자 이상 입력하세요' : null,
+                    validator: (v) => (v == null || v.length < 6)
+                        ? 'Use at least 6 characters'
+                        : null,
                   ),
                   const SizedBox(height: 24),
 
@@ -108,14 +110,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             height: 22,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2.4, color: Colors.white))
-                        : Text(_isSignUp ? '가입하기' : '로그인'),
+                        : Text(_isSignUp ? 'Sign up' : 'Sign in'),
                   ),
                   const SizedBox(height: 8),
                   TextButton(
                     onPressed: () => setState(() => _isSignUp = !_isSignUp),
                     child: Text(_isSignUp
-                        ? '이미 계정이 있어요 → 로그인'
-                        : '계정이 없어요 → 회원가입'),
+                        ? 'Already have an account? Sign in'
+                        : "Don't have an account? Sign up"),
                   ),
                 ],
               ),

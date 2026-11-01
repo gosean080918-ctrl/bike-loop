@@ -342,6 +342,25 @@ BikeReclaim/
               Android 권한/cleartext 설정, 에뮬레이터(Pixel 8)에서 로그인 화면 확인.
               ⚠ 프로젝트 경로 변경: 한글 경로 빌드 오류로 상위 폴더명 변경 →
               C:\Users\kimna\OneDrive\Desktop\student projects\Becure\BikeReclaim
+- 2026-10-26  ★지도 전 화면 빈 화면 사태 — 원인: 카카오 앱 소멸.
+              증상: 지도 탭·위치 선택·동선 지도 전부 흰 화면. 데이터(신고 목록)는
+              정상이라 네트워크 문제는 아니었음. 처음엔 WebView/레이아웃을 의심해
+              map_tab에 relayout 보강을 넣었으나 해결 안 됨.
+              진짜 원인: 앱에 박혀 있던 JS 키(69c16e04…)의 카카오 앱
+              (BikeReclaim, ID 1514725)이 콘솔 목록에 존재하지 않았다.
+              삭제됐거나 다른 카카오 계정 소유. 키가 무효라 지도 SDK가 로드 거부.
+              조치: 새 앱 'Bike Loop'(ID 1622635) 생성 → JS 키
+              f143629fbc328db1b57a03365760a430 으로 교체, JS SDK 도메인에
+              http://localhost 등록, 제품 설정>카카오맵 ON.
+              ※ 새 콘솔은 '플랫폼 등록'이 '앱>플랫폼 키>각 키에 도메인 등록'으로 바뀜.
+              ※ 카카오맵 설정 URL은 /product/kakao-map (/product/map 은 404).
+              교훈: 지도가 안 뜨면 WebView보다 '콘솔에 그 앱이 실제로 있는지'부터 볼 것.
+              APK에 키가 들어갔는지는 APK(zip) 안 libapp.so 를 문자열 검색해 확인 가능.
+- 2026-10-26  영어 시연판(demo-en 브랜치) — 시연 영상용. 기능·서비스 범위는
+              main과 동일(전국), 화면 문구만 영어. 신규 utils/romanize.dart 가
+              카카오가 주는 한글 주소와 DB 관리번호를 '표시할 때만' 로마자로 변환
+              (DB·외부 API는 그대로). 변환표는 제주 지역 + 시도 17곳 범위.
+              constants.dart 라벨 3종(condition/bikeState/status) 영문화.
 - 2026-09-15  ★일반 공개 대비 보안 강화(SEC-01) — 사용자 결정: "일반인 공개,
               위험한 것 빼고". 공개 전 반드시 처리해야 할 구멍을 막았다.
               ①서버 무인증 문제(최대 위험): Cloud Run이 allUsers 공개라

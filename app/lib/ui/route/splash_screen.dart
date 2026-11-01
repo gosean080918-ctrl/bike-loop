@@ -39,7 +39,7 @@ class SplashScreen extends ConsumerWidget {
         ),
       ),
       error: (e, _) => Scaffold(
-        body: Center(child: Text('초기화 오류: $e')),
+        body: Center(child: Text('Startup error: $e')),
       ),
     );
   }
